@@ -52,18 +52,21 @@ if upgrade_lab_nodegroup_exists; then
   echo "Nodegroup ${UPGRADE_LAB_NODEGROUP_NAME} already exists on ${UPGRADE_LAB_CLUSTER_NAME}"
 else
   echo "Creating nodegroup ${UPGRADE_LAB_NODEGROUP_NAME} on ${UPGRADE_LAB_CLUSTER_NAME}..."
-  eksctl create nodegroup \
-    --cluster "${UPGRADE_LAB_CLUSTER_NAME}" \
-    --region "${AWS_REGION}" \
-    --node-zones "${UPGRADE_LAB_NODE_ZONE:-${NODE_ZONE}}" \
-    --name "${UPGRADE_LAB_NODEGROUP_NAME}" \
-    --node-type "${UPGRADE_LAB_NODE_TYPE}" \
-    --nodes "${UPGRADE_LAB_NODE_COUNT}" \
-    --nodes-min "${UPGRADE_LAB_NODE_COUNT}" \
-    --nodes-max "${UPGRADE_LAB_NODE_COUNT}" \
-    --node-labels "workshop.aerospike.com/node-pool=baseline" \
-    --ssh-access \
-    --ssh-public-key "${SSH_PUBLIC_KEY}"
+  # Config file rather than CLI flags: the node instance role needs a permissions
+  # boundary in shared accounts, and eksctl only reads that from a config file.
+  NG_CONFIG="$(mktemp)"
+  trap 'rm -f "${NG_CONFIG}"' EXIT
+  render_managed_nodegroup_config \
+    "${UPGRADE_LAB_CLUSTER_NAME}" \
+    "${AWS_REGION}" \
+    "${UPGRADE_LAB_NODEGROUP_NAME}" \
+    "${UPGRADE_LAB_NODE_TYPE}" \
+    "${UPGRADE_LAB_NODE_ZONE:-${NODE_ZONE}}" \
+    "${UPGRADE_LAB_NODE_COUNT}" \
+    "${UPGRADE_LAB_NODE_COUNT}" \
+    "${UPGRADE_LAB_NODE_COUNT}" \
+    "workshop.aerospike.com/node-pool=baseline" > "${NG_CONFIG}"
+  eksctl create nodegroup -f "${NG_CONFIG}"
 fi
 
 wait_upgrade_lab_nodes "${UPGRADE_LAB_NODE_COUNT}"

@@ -10,7 +10,7 @@ require_cmd eksctl
 require_cmd helm
 require_cmd kubectl
 
-ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+ACCOUNT_ID="$(aws_account_id)"
 CLUSTER_ENDPOINT="$(aws eks describe-cluster --name "${CLUSTER_NAME}" --region "${AWS_REGION}" \
   --query "cluster.endpoint" --output text)"
 NODE_ROLE_NAME="KarpenterNodeRole-${CLUSTER_NAME}"
@@ -40,9 +40,11 @@ KARPENTER_NODE_POLICIES=(
   AmazonEC2ContainerRegistryReadOnly
   AmazonSSMManagedInstanceCore
 )
+set_iam_boundary_cli_args
 if ! aws iam get-role --role-name "${NODE_ROLE_NAME}" >/dev/null 2>&1; then
   aws iam create-role --role-name "${NODE_ROLE_NAME}" \
-    --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
+    --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' \
+    ${IAM_BOUNDARY_CLI_ARGS[@]+"${IAM_BOUNDARY_CLI_ARGS[@]}"} >/dev/null
   aws iam create-instance-profile --instance-profile-name "${NODE_ROLE_NAME}" >/dev/null 2>&1 || true
   aws iam add-role-to-instance-profile \
     --instance-profile-name "${NODE_ROLE_NAME}" \
@@ -78,15 +80,21 @@ if ! aws iam get-policy --policy-arn "arn:aws:iam::${ACCOUNT_ID}:policy/${CONTRO
     --policy-document file://"${WORKSHOP_ROOT}/scripts/setup/karpenter/karpenter-controller-policy.json" >/dev/null
 fi
 
-eksctl create iamserviceaccount \
-  --cluster="${CLUSTER_NAME}" \
-  --region="${AWS_REGION}" \
-  --namespace="${KARPENTER_NAMESPACE}" \
-  --name=karpenter \
-  --role-name "${CONTROLLER_ROLE_NAME}" \
-  --attach-policy-arn "arn:aws:iam::${ACCOUNT_ID}:policy/${CONTROLLER_POLICY_NAME}" \
+# Config file rather than CLI flags: the IRSA role needs a permissions boundary in
+# shared accounts, and eksctl only reads that from a config file.
+IRSA_CONFIG="$(mktemp)"
+render_iamserviceaccount_config \
+  "${CLUSTER_NAME}" \
+  "${AWS_REGION}" \
+  karpenter \
+  "${KARPENTER_NAMESPACE}" \
+  "${CONTROLLER_ROLE_NAME}" \
+  "arn:aws:iam::${ACCOUNT_ID}:policy/${CONTROLLER_POLICY_NAME}" \
+  false > "${IRSA_CONFIG}"
+eksctl create iamserviceaccount -f "${IRSA_CONFIG}" \
   --override-existing-serviceaccounts \
   --approve
+rm -f "${IRSA_CONFIG}"
 
 # Toleration/nodeSelector for the tainted system nodegroup must be set at install time, not
 # patched afterward: with --wait, helm blocks until pods schedule, and pods can't schedule

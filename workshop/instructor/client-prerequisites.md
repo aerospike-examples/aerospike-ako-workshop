@@ -31,8 +31,10 @@ This document applies to the **machine running the training** (instructor laptop
 
 | Requirement | Verify |
 |-------------|--------|
-| AWS credentials configured | `aws sts get-caller-identity` |
-| IAM for EKS, EC2, IAM, CloudFormation | Create cluster successfully |
+| AWS credentials configured (SSO: `aws sso login`) | `aws sts get-caller-identity` |
+| IAM for EKS, EC2, IAM, CloudFormation | Caller ARN printed by `./scripts/setup/01-validate-client.sh` |
+| Permissions boundary, if the account requires one | `01-validate-client.sh` prints the resolved ARN — see [below](#shared-aws-accounts-and-iam-permissions-boundaries) |
+| Unique `CLUSTER_NAME` / `UPGRADE_LAB_CLUSTER_NAME` when the account is shared | EKS + IAM names are account-global |
 | EC2 key pair in region | `aws ec2 describe-key-pairs --region us-east-1` |
 | Quota: 4× i8g.2xlarge (main eksctl baseline) | Service Quotas console |
 | Quota: 4× i8g.4xlarge (Lab 1.2 vertical scale overlap) | Service Quotas console |
@@ -43,6 +45,23 @@ This document applies to the **machine running the training** (instructor laptop
 | Karpenter IAM (controller + node roles) | Created by `scripts/setup/karpenter/00-install-controller.sh` |
 | feature-key file (`features.conf`) | File at `secrets/features.conf` |
 | kubeconfig for both clusters (Lab 2.6) | `./scripts/lib/kubecontext.sh show` |
+
+## Shared AWS accounts and IAM permissions boundaries
+
+Many organizations only allow IAM role creation when an org-defined **permissions boundary** is attached, so `eksctl create cluster` fails outright without one. Aerospike-run workshops are an example: department accounts are shared, instructors assume `shared-account-powerusers-v2`, and that role is denied `CreateRole` unless the role carries the account-local `shared-power-users-boundary` policy.
+
+Bootstrap handles this automatically: with `IAM_PERMISSIONS_BOUNDARY=auto` (default) the scripts look for that policy in the current account and attach it to every role they create — the EKS cluster service role, node instance roles, the VPC CNI and EBS CSI IRSA roles, and the Karpenter controller/node roles. Accounts with no such policy behave exactly as before.
+
+| Setting in `scripts/env/workshop.env` | Effect |
+|---------------------------------------|--------|
+| `IAM_PERMISSIONS_BOUNDARY=auto` | Attach `IAM_PERMISSIONS_BOUNDARY_NAME` when it exists in the account (default) |
+| `IAM_PERMISSIONS_BOUNDARY=required` | Same lookup, but fail client validation when the policy cannot be found |
+| `IAM_PERMISSIONS_BOUNDARY=off` | Never attach — accounts with no boundary requirement |
+| `IAM_PERMISSIONS_BOUNDARY=arn:aws:iam::<account-id>:policy/<name>` | Attach that policy verbatim |
+
+Set `IAM_PERMISSIONS_BOUNDARY_NAME` to your organization's boundary policy name (default `shared-power-users-boundary`).
+
+When the account is shared with other people, also set a unique `CLUSTER_NAME` (and `UPGRADE_LAB_CLUSTER_NAME`) before bootstrap — EKS cluster names, nodegroup names, and IAM role names are account-global. No lab needs IAM users, groups, or access keys, which such accounts typically deny.
 
 ## Repo layout on client
 
@@ -85,7 +104,9 @@ cp scripts/env/workshop.env.example scripts/env/workshop.env
 | Issue | Fix |
 |-------|-----|
 | Wrong kubectl context | `./scripts/lib/kubecontext.sh main` or `./scripts/lib/kubecontext.sh upgrade-lab` |
-| Expired AWS creds | Refresh SSO or `aws configure` |
+| Expired AWS creds | Refresh SSO (`aws sso login`) or `aws configure` |
+| `AccessDenied` / CloudFormation `CREATE_FAILED` on an IAM role | Boundary missing: check `01-validate-client.sh` output and that `IAM_PERMISSIONS_BOUNDARY` is not `off` when the account requires one |
+| `AlreadyExists` on cluster, nodegroup, or IAM role | Name already used by someone else in the account — pick a unique `CLUSTER_NAME` |
 | krew not in PATH | Add `~/.krew/bin` to PATH |
 | Helm repo 404 in browser | Use CLI only — browser URL may 404 |
 

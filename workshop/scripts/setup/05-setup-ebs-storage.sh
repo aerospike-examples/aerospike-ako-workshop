@@ -24,19 +24,27 @@ echo "OIDC provider id: ${oidc_id}"
 
 eksctl utils associate-iam-oidc-provider --cluster "${CLUSTER_NAME}" --region "${AWS_REGION}" --approve
 
-eksctl create iamserviceaccount \
-  --region "${AWS_REGION}" \
-  --name ebs-csi-controller-sa \
-  --namespace kube-system \
-  --cluster "${CLUSTER_NAME}" \
-  --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
-  --approve \
-  --role-only \
-  --role-name AmazonEKS_EBS_CSI_DriverRole
+# IAM role names are account-global, so scope it to the cluster — colleagues sharing an
+# AWS account would otherwise fight over one AmazonEKS_EBS_CSI_DriverRole.
+EBS_CSI_ROLE_NAME="AmazonEKS_EBS_CSI_DriverRole-${CLUSTER_NAME}"
 
-account_id=$(aws sts get-caller-identity --query Account --output text)
+# Config file rather than CLI flags: the IRSA role needs a permissions boundary in
+# shared accounts, and eksctl only reads that from a config file.
+IRSA_CONFIG="$(mktemp)"
+trap 'rm -f "${IRSA_CONFIG}"' EXIT
+render_iamserviceaccount_config \
+  "${CLUSTER_NAME}" \
+  "${AWS_REGION}" \
+  ebs-csi-controller-sa \
+  kube-system \
+  "${EBS_CSI_ROLE_NAME}" \
+  arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
+  true > "${IRSA_CONFIG}"
+eksctl create iamserviceaccount -f "${IRSA_CONFIG}" --approve
+
+account_id="$(aws_account_id)"
 eksctl create addon --name aws-ebs-csi-driver --cluster "${CLUSTER_NAME}" --region "${AWS_REGION}" \
-  --service-account-role-arn "arn:aws:iam::${account_id}:role/AmazonEKS_EBS_CSI_DriverRole" --force
+  --service-account-role-arn "arn:aws:iam::${account_id}:role/${EBS_CSI_ROLE_NAME}" --force
 
 kubectl get storageclass ssd
 echo "Expected: StorageClass ssd exists."

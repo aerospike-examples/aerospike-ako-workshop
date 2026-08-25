@@ -49,6 +49,10 @@ done
 require_cmd kubectl
 require_cmd eksctl
 
+# Resolve up front so the per-zone background subshells below inherit the cached value
+# instead of each repeating the STS/IAM lookups.
+resolve_iam_boundary_arn >/dev/null
+
 KARPENTER_DIR="${WORKSHOP_ROOT}/scripts/setup/karpenter"
 NODE_WAIT_TIMEOUT=900
 NVME_WAIT_TIMEOUT=1800
@@ -168,23 +172,20 @@ ensure_eksctl_nodegroup_in_zone() {
       --name="${name}" \
       --nodes="${count}"
   else
-    local create_args=(
-      --cluster "${CLUSTER_NAME}"
-      --region "${AWS_REGION}"
-      --node-zones "${zone}"
-      --name "${name}"
-      --node-type "${node_type}"
-      --nodes "${count}"
-      --nodes-min 1
-      --nodes-max 8
-      --ssh-access
-      --ssh-public-key "${SSH_PUBLIC_KEY}"
-    )
+    local labels=""
     if [[ -n "${pool_label}" ]]; then
-      create_args+=(--node-labels "workshop.aerospike.com/node-pool=${pool_label}")
+      labels="workshop.aerospike.com/node-pool=${pool_label}"
     fi
     echo "Creating nodegroup ${name} (${node_type} × ${count} in ${zone})..."
-    eksctl create nodegroup "${create_args[@]}"
+    # Config file rather than CLI flags: the node instance role needs a permissions
+    # boundary in shared accounts, and eksctl only reads that from a config file.
+    local ng_config
+    ng_config="$(mktemp)"
+    render_managed_nodegroup_config \
+      "${CLUSTER_NAME}" "${AWS_REGION}" "${name}" "${node_type}" "${zone}" \
+      "${count}" 1 8 "${labels}" > "${ng_config}"
+    eksctl create nodegroup -f "${ng_config}"
+    rm -f "${ng_config}"
   fi
   wait_eksctl_nodegroup_ready "${name}" "${count}"
   if [[ -n "${pool_label}" ]]; then

@@ -35,6 +35,8 @@
 
 | Issue | Mitigation |
 |-------|------------|
+| IAM role create denied by the AWS account | Permissions boundary missing — see `01-validate-client.sh` output and [client-prerequisites.md](../../instructor/client-prerequisites.md#shared-aws-accounts-and-iam-permissions-boundaries) |
+| `AlreadyExists` on cluster / nodegroup / IAM role | Colleague owns that name in the shared account — set a unique `CLUSTER_NAME` before bootstrap |
 | EBS CSI IAM fails | Run 05-setup-ebs-storage.sh steps manually; verify OIDC |
 | Local disk init skipped | Re-run `06-setup-local-storage.sh`; check nvme-bootstrap init logs |
 | Karpenter nodes missing NVMe | Verify nvme-bootstrap DaemonSet after 0.5 |

@@ -52,6 +52,37 @@ for f in local_volume_provisioner_cleanup.yaml local_volume_provisioner_cleanup_
 done
 
 check "AWS identity" "aws sts get-caller-identity" "Configure AWS credentials"
+
+# Accounts that mandate a permissions boundary deny CreateRole without it, so catch that here
+# rather than mid-bootstrap in CloudFormation. Shared accounts also collide on EKS/IAM names.
+CALLER_ARN="$(aws sts get-caller-identity --query Arn --output text 2>/dev/null || true)"
+if [[ -n "${CALLER_ARN}" ]]; then
+  echo "OK  AWS caller: ${CALLER_ARN}"
+  BOUNDARY_ARN="$(resolve_iam_boundary_arn)"
+  if [[ -n "${BOUNDARY_ARN}" ]]; then
+    echo "OK  IAM permissions boundary: ${BOUNDARY_ARN}"
+    if [[ "${CLUSTER_NAME}" == "my-cluster" ]]; then
+      echo "WARN CLUSTER_NAME is the default 'my-cluster' — use a unique name in a shared AWS account"
+    fi
+    if [[ "${UPGRADE_LAB_CLUSTER_NAME}" == "my-cluster-k8s-upgrade" ]]; then
+      echo "WARN UPGRADE_LAB_CLUSTER_NAME is the default — use a unique name in a shared AWS account"
+    fi
+  elif [[ "${IAM_PERMISSIONS_BOUNDARY}" == "off" ]]; then
+    if [[ "${CALLER_ARN}" == *shared-account-powerusers* ]]; then
+      echo "WARN IAM_PERMISSIONS_BOUNDARY=off but this looks like a shared account — role creation will be denied"
+    else
+      echo "SKIP IAM permissions boundary (IAM_PERMISSIONS_BOUNDARY=off)"
+    fi
+  elif [[ "${IAM_PERMISSIONS_BOUNDARY}" == "required" || "${CALLER_ARN}" == *shared-account-powerusers* ]]; then
+    echo "FAIL IAM permissions boundary — ${IAM_PERMISSIONS_BOUNDARY_NAME} not found in this account"
+    echo "     This account requires a boundary on every role: ask your AWS admins to publish it,"
+    echo "     or set IAM_PERMISSIONS_BOUNDARY to the correct policy ARN in scripts/env/workshop.env"
+    fail=1
+  else
+    echo "SKIP IAM permissions boundary (${IAM_PERMISSIONS_BOUNDARY_NAME} not present in this account)"
+  fi
+fi
+
 check "SSH key" "aws ec2 describe-key-pairs --region ${AWS_REGION} --key-names ${SSH_PUBLIC_KEY}" \
   "Create EC2 key pair ${SSH_PUBLIC_KEY} in ${AWS_REGION}"
 

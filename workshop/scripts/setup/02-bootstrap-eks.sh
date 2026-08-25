@@ -20,13 +20,13 @@ fi
 case "${NODE_PROVISIONING}" in
   eksctl)
     echo "Creating EKS cluster ${CLUSTER_NAME} in ${AWS_REGION} (K8s ${K8S_VERSION}) — control plane only..."
-    eksctl create cluster \
-      --region "${AWS_REGION}" \
-      --name "${CLUSTER_NAME}" \
-      --zones "${AWS_ZONES}" \
-      --version="${K8S_VERSION}" \
-      --without-nodegroup \
-      ${kc_args[@]+"${kc_args[@]}"}
+    # ClusterConfig instead of CLI flags: the cluster service role needs a permissions
+    # boundary in shared accounts, and eksctl only reads that from a config file.
+    RENDERED_CONFIG="$(mktemp)"
+    trap 'rm -f "${RENDERED_CONFIG}"' EXIT
+    render_cluster_config "${CLUSTER_NAME}" "${AWS_REGION}" "${K8S_VERSION}" "${AWS_ZONES}" \
+      > "${RENDERED_CONFIG}"
+    eksctl create cluster -f "${RENDERED_CONFIG}" ${kc_args[@]+"${kc_args[@]}"}
 
     echo "Done. Workload nodepool: ./scripts/setup/02-ensure-workload-nodepool.sh (step 0.2-nodes)"
     ;;
@@ -42,6 +42,13 @@ case "${NODE_PROVISIONING}" in
     export KARPENTER_SYSTEM_NODE_TYPE KARPENTER_SYSTEM_NODE_COUNT SSH_PUBLIC_KEY
     IFS=',' read -r NODE_ZONE_A NODE_ZONE_B _ <<< "${AWS_ZONES},,"
     export NODE_ZONE_A NODE_ZONE_B
+    # Empty in accounts without a boundary policy — the template lines then render blank.
+    # withOIDC on this path makes eksctl create the VPC CNI IRSA role too, so that role
+    # must be declared explicitly to carry the boundary.
+    IAM_SERVICE_ROLE_BOUNDARY="$(eksctl_iam_service_role_yaml)"
+    IAM_CNI_SERVICE_ACCOUNT="$(eksctl_iam_cni_service_account_yaml)"
+    IAM_NODEGROUP_BOUNDARY="$(eksctl_iam_nodegroup_yaml "    ")"
+    export IAM_SERVICE_ROLE_BOUNDARY IAM_CNI_SERVICE_ACCOUNT IAM_NODEGROUP_BOUNDARY
     envsubst < "${CLUSTER_CONFIG}" | eksctl create cluster -f - ${kc_args[@]+"${kc_args[@]}"}
 
     echo "Installing Karpenter controller..."

@@ -87,10 +87,209 @@ load_env() {
   : "${HELM_CLUSTER_RELEASE:=aerocluster}"
   : "${AKO_VERSION_START:=4.2.0}"
   : "${AKO_CLUSTER_CHART_VERSION:=}"
+  : "${IAM_PERMISSIONS_BOUNDARY:=auto}"
+  : "${IAM_PERMISSIONS_BOUNDARY_NAME:=shared-power-users-boundary}"
+  case "${IAM_PERMISSIONS_BOUNDARY}" in
+    auto|off|required|arn:aws:iam::*) ;;
+    *)
+      echo "ERROR: IAM_PERMISSIONS_BOUNDARY must be auto, off, required, or a policy ARN (got: ${IAM_PERMISSIONS_BOUNDARY})" >&2
+      exit 1
+      ;;
+  esac
 
   IFS=',' read -r NODE_ZONE_A NODE_ZONE_B _ <<< "${AWS_ZONES},,"
   export NODE_ZONE_A NODE_ZONE_B
   ensure_noninteractive_cli
+}
+
+aws_account_id() {
+  if [[ -z "${WORKSHOP_AWS_ACCOUNT_ID:-}" ]]; then
+    WORKSHOP_AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)"
+    export WORKSHOP_AWS_ACCOUNT_ID
+  fi
+  echo "${WORKSHOP_AWS_ACCOUNT_ID}"
+}
+
+# Many organizations only permit IAM role creation when an org-defined permissions boundary
+# is attached — for example the shared-power-users-boundary policy published into Aerospike's
+# shared accounts, where the shared-account-powerusers-v2 role is denied CreateRole without it.
+#
+# auto (default) — attach ${IAM_PERMISSIONS_BOUNDARY_NAME} when it exists in this account
+# required       — same lookup, but 01-validate-client.sh fails when it cannot be resolved
+# off            — never attach (accounts with no boundary requirement)
+# <policy ARN>   — attach verbatim
+#
+# Prints the boundary ARN, or nothing when no boundary applies. Result is cached for the
+# process (and exported for subshells) so repeated calls cost no extra AWS API calls.
+resolve_iam_boundary_arn() {
+  if [[ -n "${IAM_BOUNDARY_RESOLVED:-}" ]]; then
+    echo "${IAM_PERMISSIONS_BOUNDARY_ARN:-}"
+    return 0
+  fi
+
+  local setting="${IAM_PERMISSIONS_BOUNDARY:-auto}" arn="" account="" candidate=""
+  case "${setting}" in
+    off|"")
+      ;;
+    auto|required)
+      account="$(aws_account_id)"
+      if [[ -n "${account}" ]]; then
+        candidate="arn:aws:iam::${account}:policy/${IAM_PERMISSIONS_BOUNDARY_NAME}"
+        if aws iam get-policy --policy-arn "${candidate}" >/dev/null 2>&1; then
+          arn="${candidate}"
+        fi
+      fi
+      ;;
+    *)
+      # load_env rejects anything else, so this is a literal ARN.
+      arn="${setting}"
+      ;;
+  esac
+
+  IAM_PERMISSIONS_BOUNDARY_ARN="${arn}"
+  IAM_BOUNDARY_RESOLVED=1
+  export IAM_PERMISSIONS_BOUNDARY_ARN IAM_BOUNDARY_RESOLVED
+  echo "${arn}"
+}
+
+# Sets IAM_BOUNDARY_CLI_ARGS for `aws iam create-role` (empty when no boundary applies).
+set_iam_boundary_cli_args() {
+  local arn
+  arn="$(resolve_iam_boundary_arn)"
+  IAM_BOUNDARY_CLI_ARGS=()
+  if [[ -n "${arn}" ]]; then
+    IAM_BOUNDARY_CLI_ARGS=(--permissions-boundary "${arn}")
+  fi
+}
+
+# eksctl honors permissions boundaries only from a ClusterConfig file, never from CLI flags:
+# https://docs.aws.amazon.com/eks/latest/eksctl/iam-permissions-boundary.html
+# These helpers emit the YAML fragments (nothing when no boundary applies).
+
+# Fragment for ClusterConfig `iam:` — cluster service role (2-space indent).
+eksctl_iam_service_role_yaml() {
+  local arn
+  arn="$(resolve_iam_boundary_arn)"
+  [[ -z "${arn}" ]] && return 0
+  printf '  serviceRolePermissionsBoundary: "%s"\n' "${arn}"
+}
+
+# Fragment for a managedNodeGroups[] entry — instance role ($1 = item key indent).
+eksctl_iam_nodegroup_yaml() {
+  local indent="${1:-    }" arn
+  arn="$(resolve_iam_boundary_arn)"
+  [[ -z "${arn}" ]] && return 0
+  printf '%siam:\n%s  instanceRolePermissionsBoundary: "%s"\n' "${indent}" "${indent}" "${arn}"
+}
+
+# Fragment for ClusterConfig `iam:` — declares the VPC CNI IRSA role that eksctl otherwise
+# creates implicitly (and unbounded) whenever withOIDC is true.
+eksctl_iam_cni_service_account_yaml() {
+  local arn
+  arn="$(resolve_iam_boundary_arn)"
+  [[ -z "${arn}" ]] && return 0
+  cat <<EOF
+  serviceAccounts:
+    - metadata:
+        name: aws-node
+        namespace: kube-system
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+      permissionsBoundary: "${arn}"
+EOF
+}
+
+# Render a ClusterConfig for `eksctl create cluster -f` (control plane only, no nodegroups).
+# withOIDC stays false to match the CLI default this replaces — the OIDC provider is
+# associated later in step 0.5 (05-setup-ebs-storage.sh).
+render_cluster_config() {
+  local cluster="$1" region="$2" k8s_version="$3" zones="$4"
+  local zone
+
+  cat <<EOF
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: ${cluster}
+  region: ${region}
+  version: "${k8s_version}"
+availabilityZones:
+EOF
+  local -a zone_list=()
+  IFS=',' read -ra zone_list <<< "${zones}"
+  for zone in "${zone_list[@]}"; do
+    [[ -z "${zone}" ]] && continue
+    echo "  - ${zone}"
+  done
+  echo "iam:"
+  echo "  withOIDC: false"
+  eksctl_iam_service_role_yaml
+}
+
+# Render a single managed nodegroup ClusterConfig for `eksctl create nodegroup -f`.
+# labels is comma-separated key=value (may be empty).
+render_managed_nodegroup_config() {
+  local cluster="$1" region="$2" ng_name="$3" node_type="$4" zone="$5"
+  local desired="$6" min="$7" max="$8" labels="${9:-}"
+  local label
+
+  cat <<EOF
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: ${cluster}
+  region: ${region}
+managedNodeGroups:
+  - name: ${ng_name}
+    instanceType: ${node_type}
+    desiredCapacity: ${desired}
+    minSize: ${min}
+    maxSize: ${max}
+    availabilityZones:
+      - ${zone}
+    ssh:
+      allow: true
+      publicKeyName: ${SSH_PUBLIC_KEY}
+EOF
+  if [[ -n "${labels}" ]]; then
+    echo "    labels:"
+    local -a label_list=()
+    IFS=',' read -ra label_list <<< "${labels}"
+    for label in "${label_list[@]}"; do
+      [[ -z "${label}" ]] && continue
+      printf '      %s: "%s"\n' "${label%%=*}" "${label#*=}"
+    done
+  fi
+  eksctl_iam_nodegroup_yaml "    "
+}
+
+# Render a ClusterConfig for `eksctl create iamserviceaccount -f` (one IRSA role).
+render_iamserviceaccount_config() {
+  local cluster="$1" region="$2" sa_name="$3" sa_namespace="$4" role_name="$5"
+  local policy_arn="$6" role_only="${7:-false}"
+  local boundary
+  boundary="$(resolve_iam_boundary_arn)"
+
+  cat <<EOF
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: ${cluster}
+  region: ${region}
+iam:
+  withOIDC: true
+  serviceAccounts:
+    - metadata:
+        name: ${sa_name}
+        namespace: ${sa_namespace}
+      roleName: ${role_name}
+      roleOnly: ${role_only}
+      attachPolicyARNs:
+        - ${policy_arn}
+EOF
+  if [[ -n "${boundary}" ]]; then
+    printf '      permissionsBoundary: "%s"\n' "${boundary}"
+  fi
 }
 
 # OLM installs deployment/aerospike-operator-controller-manager; Helm uses release name.

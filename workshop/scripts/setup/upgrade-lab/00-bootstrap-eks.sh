@@ -15,12 +15,13 @@ if [[ -n "${KUBECONFIG:-}" ]]; then
 fi
 
 echo "Creating upgrade-lab EKS cluster ${UPGRADE_LAB_CLUSTER_NAME}..."
-eksctl create cluster \
-  --region "${AWS_REGION}" \
-  --name "${UPGRADE_LAB_CLUSTER_NAME}" \
-  --zones "${AWS_ZONES}" \
-  --version="${UPGRADE_LAB_K8S_VERSION_START}" \
-  --without-nodegroup \
+# ClusterConfig instead of CLI flags: the cluster service role needs a permissions
+# boundary in shared accounts, and eksctl only reads that from a config file.
+CLUSTER_CONFIG="$(mktemp)"
+trap 'rm -f "${CLUSTER_CONFIG}"' EXIT
+render_cluster_config "${UPGRADE_LAB_CLUSTER_NAME}" "${AWS_REGION}" \
+  "${UPGRADE_LAB_K8S_VERSION_START}" "${AWS_ZONES}" > "${CLUSTER_CONFIG}"
+eksctl create cluster -f "${CLUSTER_CONFIG}" \
   ${eksctl_cluster_kc_args[@]+"${eksctl_cluster_kc_args[@]}"}
 
 "${UPGRADE_DIR}/ensure-nodegroup.sh"

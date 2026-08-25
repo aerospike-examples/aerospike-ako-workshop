@@ -3,6 +3,8 @@
 #   CLUSTER_NAME, AWS_REGION, K8S_VERSION, AWS_ZONES
 #   KARPENTER_SYSTEM_NODEGROUP, KARPENTER_SYSTEM_NODE_TYPE, KARPENTER_SYSTEM_NODE_COUNT
 #   SSH_PUBLIC_KEY
+# IAM_* placeholders carry the shared-account permissions boundary and render blank in
+# accounts without one (see resolve_iam_boundary_arn in scripts/lib/common.sh).
 # Workload NodePools (${KARPENTER_NODEPOOL_NAME}-<zone>) are created in step 0.2-nodes (02-ensure-workload-nodepool.sh).
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
@@ -15,6 +17,8 @@ availabilityZones:
   - ${NODE_ZONE_B}
 iam:
   withOIDC: true
+${IAM_SERVICE_ROLE_BOUNDARY}
+${IAM_CNI_SERVICE_ACCOUNT}
 addons:
   - name: coredns
     resolveConflicts: overwrite
@@ -47,6 +51,7 @@ managedNodeGroups:
     ssh:
       allow: true
       publicKeyName: ${SSH_PUBLIC_KEY}
+${IAM_NODEGROUP_BOUNDARY}
 cloudWatch:
   clusterLogging:
     enableTypes: []
