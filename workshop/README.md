@@ -125,6 +125,7 @@ source scripts/env/workshop.env
 
 ./scripts/setup/setup-all.sh --step 0.1
 ./scripts/setup/setup-all.sh --step 0.2
+./scripts/setup/setup-all.sh --step 0.2-nodes
 ./scripts/setup/setup-all.sh --step 0.3
 ./scripts/setup/setup-all.sh --step 0.4
 ./scripts/setup/setup-all.sh --step 0.5
