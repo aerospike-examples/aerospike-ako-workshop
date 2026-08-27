@@ -17,7 +17,7 @@
 | Rule | Why |
 |------|-----|
 | Do not mix `NODE_PROVISIONING` mid-session | Node labels, NVMe init, and Lab 2.5 content differ |
-| Set `KARPENTER_CONSOLIDATION=Off` during demos | Avoid surprise node termination |
+| Set `KARPENTER_CONSOLIDATION=Off` during demos | Avoid surprise node termination — the shipped default is `WhenEmpty` (30m), so this is an explicit in-class override; scripts map the `Off` alias to `WhenEmpty` + `720h` |
 | Never demo `k8sNodeBlockList` on Karpenter | AKO #305 — use drain path only |
 | Pre-stage 4+ nodes before class | Ensure `NODE_COUNT=4` and per-AZ baseline pools from step 0.2-nodes |
 | System MNG uses `CriticalAddonsOnly` taint | EKS-standard pattern — coredns/metrics-server tolerations declared in cluster yaml, not patched ad hoc |
@@ -40,13 +40,13 @@
 | EBS CSI IAM fails | Run 05-setup-ebs-storage.sh steps manually; verify OIDC |
 | Local disk init skipped | Re-run `06-setup-local-storage.sh`; check nvme-bootstrap init logs |
 | Karpenter nodes missing NVMe | Verify nvme-bootstrap DaemonSet after 0.5 |
-| CSV stuck Pending | Approve InstallPlan |
+| CSV stuck Pending | `olm/01-install-ako.sh` already approves the pinned InstallPlan (up to 300s); patch `spec.approved` manually only if that timed out |
 | features.conf missing | 01-validate-client.sh catches this early |
 
 ## Skip paths
 
 - Pre-stage entire Section 0; start training at Section 1 Lab 1.1
-- Skip local storage (0.5 Part B) if only running Lab 1.1 dim — **required for rack labs (1.2–1.3)**
+- Skip local storage (0.5 Part B) if only running Lab 1.1 dim — **required for rack labs (1.2–1.3)**. There is no skip flag: run `setup-all.sh --step 0.5-ebs` and omit `0.5-local`, then continue with `--from 0.6-secrets`. A full `setup-all.sh` run always includes 0.5-local.
 
 ## Discussion prompts
 
@@ -55,9 +55,10 @@
 
 ## Dual cluster
 
-Step **0.7** creates the upgrade-lab cluster (`my-cluster-k8s-upgrade`) by default for Lab 2.6. It adds ~3× `i8g.2xlarge` cost during Sections 1–2.
+Step **0.7** creates the upgrade-lab cluster (`my-cluster-k8s-upgrade`) by default for Lab 2.6 — see [Lab 0.7](07-upgrade-lab-cluster.md). It starts on Kubernetes `UPGRADE_LAB_K8S_VERSION_START` (**1.31**, upgraded to 1.32 in Lab 2.6) with nodegroup `ng-upgrade-lab` (`UPGRADE_LAB_NODE_COUNT=3`× `${UPGRADE_LAB_NODE_TYPE}`), adding ~3× `i8g.2xlarge` cost during Sections 1–2.
 
-- **Parallel bootstrap:** default `setup-all.sh` creates main + upgrade-lab EKS in parallel after 0.1 (~15–25 min saved). Use `--sequential` for sequential EKS bootstrap.
+- **AKO on upgrade-lab is always OLM** — `upgrade-lab/01-install-ako.sh` calls the OLM installer regardless of `DEPLOY_PATH`, and `03-deploy-cluster.sh` deploys `aerocluster` with `kubectl apply`. Path B classes therefore see an OLM operator and a kubectl-applied cluster on this one cluster; call that out rather than letting trainees discover it in Lab 2.6.
+- **Parallel bootstrap:** default `setup-all.sh` creates main + upgrade-lab EKS in parallel after 0.1 (~15–25 min saved), then completes 0.7 with `upgrade-lab/setup-upgrade-lab-post-bootstrap.sh`. Use `--sequential` for sequential EKS bootstrap; `--step 0.7` runs the full `upgrade-lab/setup-upgrade-lab.sh` (bootstraps the cluster first if missing).
 - Skip with `./scripts/setup/setup-all.sh --skip-upgrade-lab` and run `./scripts/labs/prepare-lab.sh 2.6` before that lab
 - **Parallel teardown:** default `cleanup-lab.sh` deletes both clusters concurrently (~10–20 min saved). Use `--sequential` for serial delete.
 - Scripts restore kubectl to `my-cluster` after step 0.7; use `./scripts/lib/kubecontext.sh show` to verify

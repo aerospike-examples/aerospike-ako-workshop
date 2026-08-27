@@ -15,7 +15,7 @@ You can stand up a complete EKS lab platform — cluster, AKO, storage layers, a
 | 0.4 | [akoctl](04-install-akoctl.md) | ~10m |
 | 0.5 | [Storage layer](05-storage-layer.md) | ~25m |
 | 0.6 | [Secrets and validation](06-secrets-and-validation.md) | ~10m |
-| 0.7 | Upgrade-lab cluster (Lab 2.6) | ~15–25m post-bootstrap (EKS bootstrap runs in parallel with 0.2) |
+| 0.7 | [Upgrade-lab cluster (Lab 2.6)](07-upgrade-lab-cluster.md) | ~15–25m post-bootstrap (EKS bootstrap runs in parallel with 0.2) |
 
 ## Parallel EKS bootstrap (default)
 
@@ -23,6 +23,8 @@ Full `./scripts/setup/setup-all.sh` creates **main** and **upgrade-lab** EKS clu
 
 - Disable with `./scripts/setup/setup-all.sh --sequential` (sequential EKS bootstrap: 0.2, 0.2-nodes, then 0.3–0.6, then full 0.7)
 - Individual `--step` runs are unchanged (no parallel)
+
+The parallel run creates the upgrade-lab EKS cluster with [`upgrade-lab/00-bootstrap-eks.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-eks.sh) alongside step 0.2, then finishes step 0.7 with [`upgrade-lab/setup-upgrade-lab-post-bootstrap.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab-post-bootstrap.sh). `--step 0.7` and `--sequential` instead run the full [`upgrade-lab/setup-upgrade-lab.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab.sh), which bootstraps the cluster first if it does not exist.
 
 | Choose Path A (OLM) when… | Choose Path B (Helm) when… |
 |---------------------------|------------------------------|
@@ -47,11 +49,11 @@ Set `NODE_PROVISIONING=eksctl` or `karpenter` in [workshop.env.example](../../sc
 - Does **not** deploy an Aerospike cluster on the main cluster — labs deploy their own baseline
 - Does **not** cover scaling, upgrades, or maintenance — Sections 1 and 2
 
-Step **0.7** creates the separate upgrade-lab EKS cluster for Lab 2.6 only (provisions local-ssd when `CLUSTER_STORAGE=disk`, the default). Skip it with `./scripts/setup/setup-all.sh --skip-upgrade-lab` to save cost, then run `./scripts/labs/prepare-lab.sh 2.6` before that lab.
+Step **0.7** builds the separate upgrade-lab EKS cluster for Lab 2.6 only. Unlike the main cluster it is a complete, ready-to-upgrade environment: AKO is installed **via OLM regardless of `DEPLOY_PATH`**, the same secrets as the main cluster are applied, local-ssd is provisioned when the resolved storage for lab 2.6 is `disk` (the `CLUSTER_STORAGE` default), and an `AerospikeCluster` named `aerocluster` is deployed with `kubectl apply`. Scripts restore your kubectl context to `${CLUSTER_NAME}` afterwards. Skip it with `./scripts/setup/setup-all.sh --skip-upgrade-lab` to save cost, then run `./scripts/labs/prepare-lab.sh 2.6` before that lab. Details: [Lab 0.7](07-upgrade-lab-cluster.md).
 
 ## Step-by-step setup (teaching flow)
 
-Run each setup step individually — script numbers match step IDs:
+Run each setup step individually — setup script numbers (`01`–`08`) map to step IDs via `--list`:
 
 ```bash
 cd workshop
@@ -65,7 +67,7 @@ source scripts/env/workshop.env
 ./scripts/setup/setup-all.sh --step 0.4
 ./scripts/setup/setup-all.sh --step 0.5    # ebs + local
 ./scripts/setup/setup-all.sh --step 0.6    # secrets + validate
-./scripts/setup/setup-all.sh --step 0.7    # upgrade-lab (Lab 2.6)
+./scripts/setup/setup-all.sh --step 0.7    # upgrade-lab (Lab 2.6) — see 07-upgrade-lab-cluster.md
 ```
 
 Or invoke scripts directly:
@@ -84,6 +86,25 @@ Or invoke scripts directly:
 ```
 
 See `./scripts/setup/setup-all.sh --list` for the full step → script mapping.
+
+### Step IDs and resume
+
+`--step` also accepts the atomic IDs behind the composites, and `--from` resumes a full run at any step (single-step runs print the exact `--from` command to continue with):
+
+| Step ID | Script |
+|---------|--------|
+| `0.5` | composite: `0.5-ebs` + `0.5-local` |
+| `0.5-ebs` | [`05-setup-ebs-storage.sh`](../../scripts/setup/05-setup-ebs-storage.sh) |
+| `0.5-local` | [`06-setup-local-storage.sh`](../../scripts/setup/06-setup-local-storage.sh) |
+| `0.6` | composite: `0.6-secrets` + `0.6-validate` |
+| `0.6-secrets` | [`07-deploy-secrets.sh`](../../scripts/setup/07-deploy-secrets.sh) |
+| `0.6-validate` | [`08-validate-environment.sh`](../../scripts/setup/08-validate-environment.sh) |
+| `0.7` / `0.7-upgrade-lab` | [`upgrade-lab/setup-upgrade-lab.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab.sh) |
+
+```bash
+./scripts/setup/setup-all.sh --step 0.5-ebs     # EBS only, skip local NVMe
+./scripts/setup/setup-all.sh --from 0.5-local   # resume through 0.7
+```
 
 ## Quick orchestration (pre-staging shortcut)
 
@@ -109,8 +130,8 @@ See [instructor-notes.md](instructor-notes.md).
 
 ## Workshop artifacts
 
-- EKS reference config: [clusters/upgrade-lab-cluster.yaml](../../clusters/upgrade-lab-cluster.yaml)
-- **Baseline Aerospike cluster (3 nodes):**
-  - Path A: [manifests/disk-cluster.yaml](../../manifests/disk-cluster.yaml) (default) · [manifests/dim-cluster.yaml](../../manifests/dim-cluster.yaml) (`--dim`)
+- EKS reference configs: [clusters/main-cluster.yaml](../../clusters/main-cluster.yaml) · [clusters/upgrade-lab-cluster.yaml](../../clusters/upgrade-lab-cluster.yaml) — documentation only. Bootstrap scripts render their own ClusterConfig from `workshop.env` and run `eksctl create cluster -f`; the Karpenter path is the one exception, applying [clusters/main-cluster-karpenter.yaml](../../clusters/main-cluster-karpenter.yaml) through `envsubst`.
+- **Baseline Aerospike cluster (3 nodes)** — selected by `CLUSTER_STORAGE` (`disk` default, `dim` for in-memory), not a script flag:
+  - Path A: [manifests/disk-cluster.yaml](../../manifests/disk-cluster.yaml) · [manifests/dim-cluster.yaml](../../manifests/dim-cluster.yaml)
   - Path B: [helm/base-disk-cluster-values.yaml](../../helm/base-disk-cluster-values.yaml) · [helm/base-dim-cluster-values.yaml](../../helm/base-dim-cluster-values.yaml)
 

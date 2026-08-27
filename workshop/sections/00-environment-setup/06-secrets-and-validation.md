@@ -26,7 +26,16 @@ Secrets are deployed and the platform is validated — **no AerospikeCluster yet
    ./scripts/setup/07-deploy-secrets.sh
    ```
 
-   **Expected:** Secrets `aerospike-secret`, `auth-secret`, etc. in `aerospike` namespace.
+   **Expected:** Four secrets in the `${NAMESPACE}` (default `aerospike`) namespace:
+
+   | Secret | Contents |
+   |--------|----------|
+   | `aerospike-secret` | `features.conf` feature-key file |
+   | `auth-secret` | password `admin123` |
+   | `auth-app-secret` | password `app123` |
+   | `auth-exporter-secret` | password `exporter123` |
+
+   The script creates the namespace if needed and copies `FEATURES_CONF_PATH` into `secrets/features.conf` when it is sourced from elsewhere.
 
 2. Run environment validation:
 
@@ -34,7 +43,17 @@ Secrets are deployed and the platform is validated — **no AerospikeCluster yet
    ./scripts/setup/08-validate-environment.sh
    ```
 
-   **Expected:** Exit code 0; message "Environment ready for lab sections." Workload nodepool has `${NODE_COUNT}` Ready nodes. Validation also restarts the local-volume-provisioner (if needed) and checks that local-ssd PVs were discovered.
+   **Expected:** Exit code 0; message "Environment ready for lab sections." Validation covers, in order:
+
+   - Karpenter controller Ready (only when `NODE_PROVISIONING=karpenter`)
+   - `${NODE_COUNT}` Ready nodes labelled `workshop.aerospike.com/node-pool=baseline`, distributed across more than one AZ
+   - `nvme-bootstrap` DaemonSet present and `local-volume-node-cleanup-controller` Ready
+   - local-ssd PV count for the baseline pool — restarts the local-volume-provisioner only if the count is short
+   - operator health: CSV `Succeeded` (`DEPLOY_PATH=olm`) or Helm release present (`helm`)
+   - StorageClasses `ssd` and `local-ssd`
+   - akoctl krew plugin installed
+   - secrets `aerospike-secret`, `auth-secret`, `auth-app-secret` (it does not check `auth-exporter-secret`)
+   - no `AerospikeCluster` in the namespace — a leftover cluster is a `WARN`, not a failure
 
 ## Verify (pass/fail)
 
@@ -44,13 +63,13 @@ Secrets are deployed and the platform is validated — **no AerospikeCluster yet
    kubectl -n aerospike get secrets
    ```
 
-2. No cluster deployed yet:
+2. No cluster deployed yet on the **main** cluster:
 
    ```bash
    kubectl -n aerospike get aerospikecluster
    ```
 
-   **Pass:** No resources (or empty list).
+   **Pass:** No resources (or empty list). Step 0.7 does deploy `aerocluster`, but only on the separate upgrade-lab cluster.
 
 3. Operator healthy (from 0.3).
 
@@ -77,13 +96,16 @@ Secrets are deployed and the platform is validated — **no AerospikeCluster yet
 
 ## Teardown / handoff
 
-**Environment ready.** Proceed to [Section 1 — Scaling & Capacity](../01-scaling-and-capacity/README.md).
+**Main cluster ready.** The script closes with `Run ./scripts/labs/prepare-lab.sh 1.1 to start Section 1 (full reset + re-ensure nodes)`.
+
+- Unless you passed `--skip-upgrade-lab`, finish [Lab 0.7 — upgrade-lab cluster](07-upgrade-lab-cluster.md) next
+- Then proceed to [Section 1 — Scaling & Capacity](../01-scaling-and-capacity/README.md)
 
 ## Workshop artifacts
 
 - No AerospikeCluster manifest in this step — secrets via [`scripts/setup/07-deploy-secrets.sh`](../../scripts/setup/07-deploy-secrets.sh)
-- Baseline cluster files used in Section 1 (for reference):
-  - Path A: [manifests/disk-cluster.yaml](../../manifests/disk-cluster.yaml) (default) · [manifests/dim-cluster.yaml](../../manifests/dim-cluster.yaml) (`--dim`)
+- Baseline cluster files used in Section 1 (for reference) — selected by `CLUSTER_STORAGE` (`disk` default, `dim` for in-memory):
+  - Path A: [manifests/disk-cluster.yaml](../../manifests/disk-cluster.yaml) · [manifests/dim-cluster.yaml](../../manifests/dim-cluster.yaml)
   - Path B: [helm/base-disk-cluster-values.yaml](../../helm/base-disk-cluster-values.yaml) · [helm/base-dim-cluster-values.yaml](../../helm/base-dim-cluster-values.yaml)
 
 ## References

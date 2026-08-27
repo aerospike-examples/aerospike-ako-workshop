@@ -18,6 +18,19 @@ The instructor client has all required tools, AWS access, and licensing files be
 - Aerospike Enterprise **feature-key file** (`features.conf`)
 - AWS account (SSO or access keys) allowed to create EKS clusters, EC2 instances, CloudFormation stacks, and IAM roles
 
+### What `01-validate-client.sh` checks
+
+| Category | Checks |
+|----------|--------|
+| Required tools | `aws`, `kubectl`, `eksctl`, `git`, `curl`, `bash`, `krew` |
+| Conditional tools | `helm` — when `DEPLOY_PATH=helm` **or** `NODE_PROVISIONING=karpenter` (Karpenter controller install) |
+| Optional tools | `jq` (recommended), `akoctl` (installed in Lab 0.4) |
+| AWS access | `aws sts get-caller-identity`; IAM permissions boundary per `IAM_PERMISSIONS_BOUNDARY`; EC2 key pair `${SSH_PUBLIC_KEY}` in `${AWS_REGION}` |
+| Workshop files | `secrets/features.conf`; `vendor/storage/local_volume_provisioner_cleanup.yaml` and `local_volume_provisioner_cleanup_rbac.yaml` |
+| Capacity | delegates to [`01b-check-ec2-capacity.sh`](../../scripts/setup/01b-check-ec2-capacity.sh) when everything above passes |
+
+Presence and `--version` are what get verified — the script does not assert minimum tool versions, so check those against [client prerequisites](../../instructor/client-prerequisites.md) yourself.
+
 ## Steps
 
 1. Clone the workshop repo and open the `workshop/` directory.
@@ -44,7 +57,7 @@ The instructor client has all required tools, AWS access, and licensing files be
    ./scripts/setup/01-validate-client.sh
    ```
 
-   **Expected:** All checks print `OK`; exit code 0. Capacity pre-flight verifies `${MIN_NODES_PER_ZONE}` on-demand dry-runs per zone for both `${NODE_TYPE}` and `${NODE_TYPE_VERTICAL}`.
+   **Expected:** All checks print `OK`; exit code 0. Capacity pre-flight confirms each instance type is offered in every `AWS_ZONES` entry, runs `${MIN_NODES_PER_ZONE}` on-demand dry-runs per zone for both `${NODE_TYPE}` and `${NODE_TYPE_VERTICAL}`, and verifies the **Running On-Demand G and VT** quota is at least `NODE_COUNT × 2` (the Lab 1.2 peak of 4× `i8g.2xlarge` plus 4× `i8g.4xlarge`). An unreadable quota prints `SKIP` — verify it manually in that case.
 
    **Sample output:**
 
@@ -57,9 +70,12 @@ The instructor client has all required tools, AWS access, and licensing files be
    OK  IAM permissions boundary: arn:aws:iam::123456789012:policy/shared-power-users-boundary
    ...
    === EC2 capacity pre-flight (us-east-1, zones: us-east-1c,us-east-1d) ===
+   OK  us-east-1c i8g.2xlarge offered in AZ
+   OK  us-east-1c i8g.4xlarge offered in AZ
    OK  us-east-1c i8g.2xlarge: 2/2 on-demand dry-runs
    OK  us-east-1c i8g.4xlarge: 2/2 on-demand dry-runs
    ...
+   OK  G/VT on-demand quota 128 (need >= 8 at Lab 1.2 peak)
    EC2 capacity pre-flight passed.
    Client validation passed.
    ```
@@ -81,7 +97,10 @@ The instructor client has all required tools, AWS access, and licensing files be
 | `AlreadyExists` on cluster / nodegroup / IAM role | Name already used by someone else in the account — pick a unique `CLUSTER_NAME` |
 | krew not found | https://krew.sigs.k8s.io/docs/user-guide/setup/install/ |
 | features.conf missing | Obtain from Aerospike licensing portal |
-| EC2 capacity pre-flight fails (`InsufficientInstanceCapacity`) | Change `AWS_ZONES` in `workshop.env` to an AZ pair where both `i8g.2xlarge` and `i8g.4xlarge` pass `./scripts/setup/01b-check-ec2-capacity.sh`, then create the cluster |
+| `FAIL helm` | Path B (`DEPLOY_PATH=helm`) or `NODE_PROVISIONING=karpenter` requires Helm on the client — install it or switch paths |
+| `FAIL vendor/storage/...` | Vendored cleanup manifests missing from the repo checkout — re-clone or restore [`vendor/storage/`](../../vendor/storage/) |
+| EC2 capacity pre-flight fails (`not offered in AZ` or `InsufficientInstanceCapacity`) | Change `AWS_ZONES` in `workshop.env` to an AZ pair where both `i8g.2xlarge` and `i8g.4xlarge` pass `./scripts/setup/01b-check-ec2-capacity.sh`, then create the cluster |
+| `FAIL G/VT on-demand quota` | Quota is below `NODE_COUNT × 2` — request an increase for **Running On-Demand G and VT instances** before Lab 1.2, or lower `NODE_COUNT` |
 
 ## Workshop artifacts
 
@@ -94,4 +113,4 @@ The instructor client has all required tools, AWS access, and licensing files be
 
 ## Teardown / handoff
 
-Proceed to [Lab 0.2 — EKS cluster](02-eks-cluster.md).
+Proceed to Lab 0.2 — [eksctl managed nodegroups](02-eks-cluster.md) (`NODE_PROVISIONING=eksctl`, default) or [Karpenter](02-eks-cluster-karpenter.md) (`NODE_PROVISIONING=karpenter`).

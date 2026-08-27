@@ -50,7 +50,7 @@ load_env() {
   : "${OPERATOR_REPO:=aerospike-kubernetes-operator}"
   : "${DEPLOY_PATH:=olm}"
   : "${NODE_PROVISIONING:=eksctl}"
-  : "${KARPENTER_VERSION:=1.1.1}"
+  : "${KARPENTER_VERSION:=1.11.2}"
   : "${KARPENTER_NAMESPACE:=karpenter}"
   : "${KARPENTER_CONSOLIDATION:=WhenEmpty}"
   case "${KARPENTER_CONSOLIDATION}" in

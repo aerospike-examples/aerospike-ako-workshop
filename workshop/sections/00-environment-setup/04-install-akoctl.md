@@ -16,6 +16,7 @@
 ## Prerequisites
 
 - Lab 0.3 complete (AKO installed)
+- krew installed on the client (checked in Lab 0.1; the script fails fast without it)
 
 ## Steps
 
@@ -24,6 +25,8 @@
    ```bash
    ./scripts/setup/04-install-akoctl.sh
    ```
+
+   The script adds the krew index `akoctl` from `https://github.com/aerospike/aerospike-kubernetes-operator-ctl.git`, installs or upgrades the `akoctl/akoctl` plugin, and then runs `kubectl akoctl auth create -n ${NAMESPACE}` for you — no separate RBAC command is needed.
 
 2. Verify plugin:
 

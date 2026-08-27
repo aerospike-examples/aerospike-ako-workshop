@@ -19,7 +19,7 @@ A Karpenter-managed EKS cluster with a **system** managed nodegroup for the cont
 - EC2 key pair `${SSH_PUBLIC_KEY}` exists in `${AWS_REGION}`
 - Quota for **4–8×** `i8g.2xlarge` plus 2× `t3.large` system nodes
 - Quota for **4–8×** `i8g.4xlarge` during Lab 1.2 Phase 2 (may run **8 nodes** total with idle baseline pool)
-- Helm 3.12+ (controller install)
+- Helm on the client (controller install) — `01-validate-client.sh` checks that `helm version` runs when `NODE_PROVISIONING=karpenter`, but does not assert a minimum version; Helm 3.12+ is recommended
 
 ## Starting state
 
@@ -40,10 +40,12 @@ A Karpenter-managed EKS cluster with a **system** managed nodegroup for the cont
    ./scripts/setup/02-bootstrap-eks.sh
    ```
 
+   Bootstrap applies [main-cluster-karpenter.yaml](../../clusters/main-cluster-karpenter.yaml) through `envsubst`, then calls [`karpenter/00-install-controller.sh`](../../scripts/setup/karpenter/00-install-controller.sh) directly, which installs the controller from the Helm OCI chart `public.ecr.aws/karpenter/karpenter` at `${KARPENTER_VERSION}` (default **1.11.2**). [`karpenter/setup-all-karpenter.sh`](../../scripts/setup/karpenter/setup-all-karpenter.sh) exists for standalone use but is **not** part of this step.
+
    **Expected:**
-   - eksctl creates cluster + `${KARPENTER_SYSTEM_NODEGROUP}` (2× `${KARPENTER_SYSTEM_NODE_TYPE}`, `CriticalAddonsOnly` taint)
+   - eksctl creates cluster + `${KARPENTER_SYSTEM_NODEGROUP}` (`${KARPENTER_SYSTEM_NODE_COUNT}`× `${KARPENTER_SYSTEM_NODE_TYPE}`, `CriticalAddonsOnly` taint) in the **first AZ only** (`${NODE_ZONE_A}`)
    - CoreDNS and metrics-server schedule on system nodes via declarative addon config in [main-cluster-karpenter.yaml](../../clusters/main-cluster-karpenter.yaml)
-   - Karpenter controller Running in `karpenter` namespace
+   - Karpenter controller Running in `${KARPENTER_NAMESPACE}` (default `karpenter`)
    - **No** workload nodes yet (system nodes only)
 
 3. Create workload NodePool (step 0.2-nodes):
@@ -51,6 +53,8 @@ A Karpenter-managed EKS cluster with a **system** managed nodegroup for the cont
    ```bash
    ./scripts/setup/02-ensure-workload-nodepool.sh
    ```
+
+   This wrapper execs `./scripts/labs/lab-nodes.sh 1.1 ensure`, which applies the EC2NodeClass and per-AZ NodePools, schedules bootstrap Deployments to force provisioning, and waits up to 900s (15 min) for nodes to join.
 
    **Expected:** `${NODE_COUNT}`× `${NODE_TYPE}` workload nodes Ready across `${AWS_ZONES}` (≥ `${MIN_NODES_PER_ZONE}` per zone).
 
@@ -79,6 +83,8 @@ kubectl get nodes -l workshop.aerospike.com/workload=aerospike -o custom-columns
 ```
 
 **Pass:** Karpenter Ready; `${NODE_COUNT}` workload nodes Ready (per-AZ NodePools `${KARPENTER_NODEPOOL_NAME}-*`); each node's `karpenter.sh/nodepool` matches its zone pool name.
+
+The `POLICY` / `AFTER` columns show the applied Karpenter API values, so with the workshop `Off` alias expect `WhenEmpty` and `720h` — never a literal `Off`. Default `workshop.env` ships `KARPENTER_CONSOLIDATION=WhenEmpty`, whose NodePool YAML uses `consolidateAfter: 30m`.
 
 Reference config: [clusters/main-cluster-karpenter.yaml](../../clusters/main-cluster-karpenter.yaml)
 

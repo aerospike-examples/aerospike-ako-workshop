@@ -31,7 +31,6 @@ EBS-backed clusters (`storageClass: ssd`) use AKO defaults for block volumes and
 
 - Lab 0.4 complete
 - Vendored cleanup manifests under [`vendor/storage/`](../../vendor/storage/) (`local_volume_provisioner_cleanup*.yaml`) — checked by `01-validate-client.sh`
-- AKO operator repo is cloned automatically by setup scripts when needed (not a manual prerequisite)
 
 ## Steps — EBS (Part A)
 
@@ -41,13 +40,15 @@ EBS-backed clusters (`storageClass: ssd`) use AKO defaults for block volumes and
    ./scripts/setup/05-setup-ebs-storage.sh
    ```
 
+   The script applies [`vendor/storage/eks_ssd_storage_class.yaml`](../../vendor/storage/eks_ssd_storage_class.yaml), associates the cluster OIDC provider, creates the IRSA role `AmazonEKS_EBS_CSI_DriverRole-${CLUSTER_NAME}` for `ebs-csi-controller-sa`, and installs the `aws-ebs-csi-driver` addon.
+
 2. Verify:
 
    ```bash
    kubectl get storageclass ssd
    ```
 
-   **Expected:** StorageClass `ssd` with provisioner `ebs.csi.aws.com`.
+   **Expected:** StorageClass `ssd` (default class) with provisioner `kubernetes.io/aws-ebs` and `type: gp2`. The vendored class uses the in-tree provisioner; the EBS CSI driver addon backs it through CSI migration.
 
 ## Steps — Local NVMe (Part B)
 
@@ -58,6 +59,8 @@ Both eksctl and Karpenter use the same **`nvme-bootstrap` DaemonSet** — no man
    ```bash
    ./scripts/setup/06-setup-local-storage.sh
    ```
+
+   The script applies the `local-ssd` StorageClass, the provisioner, and the cleanup RBAC/controller, then renders ConfigMap `nvme-disk-layouts` in `kube-system` from [`config/disk-layouts.yaml`](../../config/disk-layouts.yaml) plus `nvme-init.py` (applying the `NVME_DISK_LAYOUT` override), applies the DaemonSet, and waits up to `NVME_WAIT_TIMEOUT` (default 1800s) for bootstrap pods. If no baseline nodes exist yet it skips the PV check and defers it to step 0.6.
 
 2. Verify provisioner pods:
 
