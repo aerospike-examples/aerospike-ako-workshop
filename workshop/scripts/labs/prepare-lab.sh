@@ -60,12 +60,13 @@ validate_lab_2_6_starting_state() {
   local fail=0
   local version running phase expected_engine
 
-  version="$(aws eks describe-cluster --name "${UPGRADE_LAB_CLUSTER_NAME}" --region "${AWS_REGION}" \
-    --query 'cluster.version' --output text 2>/dev/null || echo unknown)"
-  if [[ "${version}" == "${UPGRADE_LAB_K8S_VERSION_START}" ]]; then
-    echo "OK  EKS version ${version}"
+  version="$(provider_control_plane_version "${UPGRADE_LAB_CLUSTER_NAME}")"
+  if type provider_version_matches >/dev/null 2>&1 && provider_version_matches "${version}" "${UPGRADE_LAB_K8S_VERSION_START}"; then
+    echo "OK  $(provider_display_name) version ${version}"
+  elif [[ "${version}" == "${UPGRADE_LAB_K8S_VERSION_START}" ]]; then
+    echo "OK  $(provider_display_name) version ${version}"
   else
-    echo "FAIL EKS version ${version} (expected ${UPGRADE_LAB_K8S_VERSION_START})"
+    echo "FAIL $(provider_display_name) version ${version} (expected ${UPGRADE_LAB_K8S_VERSION_START})"
     fail=1
   fi
 

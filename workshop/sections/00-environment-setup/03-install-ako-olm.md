@@ -4,7 +4,7 @@
 |-------|-------|
 | Lab ID | `0.3` |
 | Section | Environment Setup |
-| EKS cluster | `${CLUSTER_NAME}` (default `my-cluster`) |
+| Cluster | `${CLUSTER_NAME}` (default `my-cluster`) |
 | AKO version | `${AKO_VERSION_START}` — default `4.2.0` (intentionally older for Lab 2.2) |
 | OLM version | `${OLM_VERSION}` (default `v0.43.0`) |
 | Deploy path | A (kubectl/OLM) |

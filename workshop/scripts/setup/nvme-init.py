@@ -43,6 +43,25 @@ def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[st
     return subprocess.run(cmd, check=check, text=True, capture_output=True)
 
 
+def gcp_machine_type() -> str | None:
+    req = urllib.request.Request(
+        "http://metadata.google.internal/computeMetadata/v1/instance/machine-type",
+        headers={"Metadata-Flavor": "Google"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            return resp.read().decode().strip().rsplit("/", 1)[-1]
+    except OSError:
+        return None
+
+
+def detect_instance_type() -> str:
+    gcp = gcp_machine_type()
+    if gcp:
+        return gcp
+    return imds_instance_type()
+
+
 def imds_instance_type() -> str:
     """Read instance type from EC2 IMDSv2 (stdlib only — avoids curl/curl-minimal dnf conflicts)."""
     token_req = urllib.request.Request(
@@ -473,7 +492,7 @@ def load_layout() -> tuple[str, dict]:
         config = yaml.safe_load(handle)
     force = (config.get("force_layout") or "").strip()
     layouts = config.get("layouts") or {}
-    instance_type = force or imds_instance_type()
+    instance_type = force or detect_instance_type()
     layout = layouts.get(instance_type) or layouts.get("default") or {}
     print(
         f"instance-type={instance_type} "

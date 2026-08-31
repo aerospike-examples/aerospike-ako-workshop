@@ -44,12 +44,40 @@ load_env() {
     CLUSTER_NAME="${preserve_cluster}"
   fi
   : "${CLUSTER_NAME:=my-cluster}"
+  : "${CLOUD_PROVIDER:=eks}"
   : "${AWS_REGION:=us-east-1}"
+  : "${GCP_PROJECT:=}"
+  : "${GCP_REGION:=us-central1}"
   : "${NAMESPACE:=aerospike}"
   : "${OPERATOR_NAMESPACE:=operators}"
   : "${OPERATOR_REPO:=aerospike-kubernetes-operator}"
   : "${DEPLOY_PATH:=olm}"
-  : "${NODE_PROVISIONING:=eksctl}"
+  case "${CLOUD_PROVIDER}" in
+    eks|gke) ;;
+    *)
+      echo "ERROR: CLOUD_PROVIDER must be eks or gke (got: ${CLOUD_PROVIDER})" >&2
+      exit 1
+      ;;
+  esac
+  if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+    : "${NODE_PROVISIONING:=nodepool}"
+    if [[ "${NODE_PROVISIONING}" == "karpenter" ]]; then
+      echo "ERROR: NODE_PROVISIONING=karpenter is AWS-only; GKE uses NODE_PROVISIONING=nodepool" >&2
+      exit 1
+    fi
+    if [[ "${NODE_PROVISIONING}" != "nodepool" ]]; then
+      echo "ERROR: GKE requires NODE_PROVISIONING=nodepool (got: ${NODE_PROVISIONING})" >&2
+      exit 1
+    fi
+    : "${GKE_SYSTEM_NODEGROUP:=default-pool}"
+    : "${GKE_SYSTEM_NODE_TYPE:=e2-standard-4}"
+    : "${GKE_SYSTEM_NODE_COUNT:=2}"
+    : "${GKE_LOCAL_SSD_COUNT:=3}"
+    : "${GKE_LOCAL_SSD_COUNT_VERTICAL:=6}"
+    : "${GKE_LOCAL_SSD_PVC_SIZE:=340Gi}"
+  else
+    : "${NODE_PROVISIONING:=eksctl}"
+  fi
   : "${KARPENTER_VERSION:=1.11.2}"
   : "${KARPENTER_NAMESPACE:=karpenter}"
   : "${KARPENTER_CONSOLIDATION:=WhenEmpty}"
@@ -71,6 +99,11 @@ load_env() {
   : "${NODEGROUP_NAME:=ng-aerospike}"
   : "${NODEGROUP_NAME_VERTICAL:=ng-aerospike-4xl}"
   : "${AWS_ZONES:=us-east-1c,us-east-1d}"
+  if [[ -n "${CLUSTER_ZONES:-}" ]]; then
+    AWS_ZONES="${CLUSTER_ZONES}"
+  else
+    CLUSTER_ZONES="${AWS_ZONES}"
+  fi
   : "${MIN_NODES_PER_ZONE:=2}"
   : "${UPGRADE_LAB_CLUSTER_NAME:=my-cluster-k8s-upgrade}"
   : "${UPGRADE_LAB_NODEGROUP_NAME:=ng-upgrade-lab}"
@@ -97,9 +130,11 @@ load_env() {
       ;;
   esac
 
-  IFS=',' read -r NODE_ZONE_A NODE_ZONE_B _ <<< "${AWS_ZONES},,"
-  export NODE_ZONE_A NODE_ZONE_B
+  IFS=',' read -r NODE_ZONE_A NODE_ZONE_B _ <<< "${CLUSTER_ZONES},,"
+  export NODE_ZONE_A NODE_ZONE_B CLUSTER_ZONES AWS_ZONES CLOUD_PROVIDER
   ensure_noninteractive_cli
+  # shellcheck source=provider.sh
+  source "${SCRIPT_DIR}/provider.sh"
 }
 
 aws_account_id() {
@@ -398,8 +433,7 @@ require_cmd() {
 }
 
 cluster_exists() {
-  local name="$1"
-  eksctl get cluster --name "${name}" --region "${AWS_REGION}" >/dev/null 2>&1
+  provider_cluster_exists "$1"
 }
 
 workshop_kubeconfig_dir() {
@@ -482,20 +516,15 @@ current_kube_context() {
 
 ensure_kubecontext() {
   local cluster_name="$1"
-  require_cmd aws
   require_cmd kubectl
 
   if ! cluster_exists "${cluster_name}"; then
-    echo "ERROR: EKS cluster '${cluster_name}' not found in ${AWS_REGION}" >&2
+    echo "ERROR: $(provider_display_name) cluster '${cluster_name}' not found" >&2
     echo "Create it first or check UPGRADE_LAB_CLUSTER_NAME / CLUSTER_NAME in workshop.env" >&2
     exit 1
   fi
 
-  if [[ -n "${KUBECONFIG:-}" ]]; then
-    aws eks update-kubeconfig --name "${cluster_name}" --region "${AWS_REGION}" --kubeconfig "${KUBECONFIG}" >/dev/null
-  else
-    aws eks update-kubeconfig --name "${cluster_name}" --region "${AWS_REGION}" >/dev/null
-  fi
+  provider_update_kubeconfig "${cluster_name}"
   echo "kubectl context: $(current_kube_context) (cluster: $(current_kube_cluster))"
 }
 
@@ -506,7 +535,7 @@ assert_kubecontext() {
 
   if [[ "${current_cluster}" != *"${expected_cluster}"* ]]; then
     echo "ERROR: kubectl is not targeting '${expected_cluster}' (current cluster: ${current_cluster:-unknown})" >&2
-    echo "Run: aws eks update-kubeconfig --name ${expected_cluster} --region ${AWS_REGION}" >&2
+    echo "Run: $(provider_kubeconfig_hint "${expected_cluster}")" >&2
     exit 1
   fi
 }

@@ -1,8 +1,10 @@
 # Aerospike AKO Workshop
 
-Private instructor-led workshop materials for the **Aerospike Kubernetes Operator (AKO)** on AWS EKS.
+Private instructor-led workshop materials for the **Aerospike Kubernetes Operator (AKO)** on AWS EKS (default) or GKE Standard.
 
 ## Quick start
+
+**EKS (default):**
 
 ```bash
 git clone git@github.com:realmgic/aerospike-ako-workshop.git
@@ -12,11 +14,21 @@ cp /path/to/your/features.conf secrets/features.conf   # license — not in repo
 ./scripts/setup/01-validate-client.sh
 ```
 
+**GKE Standard:**
+
+```bash
+cd aerospike-ako-workshop/workshop
+cp scripts/env/workshop.env.gke.example scripts/env/workshop.env
+# set GCP_PROJECT
+cp /path/to/your/features.conf secrets/features.conf
+./scripts/setup/01-validate-client.sh
+```
+
 Full walkthrough guide: [workshop/README.md](workshop/README.md)
 
 ## Prerequisites
 
-- AWS account with EKS permissions
+- AWS account with EKS permissions **or** a GCP project with GKE Standard permissions
 - Aerospike Enterprise `features.conf` (from licensing portal)
 - Tools listed in [workshop/instructor/client-prerequisites.md](workshop/instructor/client-prerequisites.md)
 

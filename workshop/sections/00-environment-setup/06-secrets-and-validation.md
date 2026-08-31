@@ -4,7 +4,7 @@
 |-------|-------|
 | Lab ID | `0.6` |
 | Section | Environment Setup |
-| EKS cluster | `my-cluster` |
+| Cluster | `${CLUSTER_NAME}` (default `my-cluster`) |
 | Aerospike cluster | — (none yet) |
 | Duration | ~10 min |
 | Validation status | `draft` |
@@ -87,7 +87,7 @@ Secrets are deployed and the platform is validated — **no AerospikeCluster yet
    kubectl get pv -o custom-columns=NAME:.metadata.name,CLASS:.spec.storageClassName,CAPACITY:.spec.capacity.storage,STATUS:.status.phase --no-headers | awk '$2 == "local-ssd"'
    ```
 
-   **Pass:** PV count matches instance-type layout × `${NODE_COUNT}` (e.g. 12 PVs for 4× i8g.2xlarge).
+   **Pass:** PV count matches instance-type layout × `${NODE_COUNT}` (e.g. EKS: 12 PVs for 4× i8g.2xlarge; GKE: 12 PVs for 4× n2-highmem-8 — 3 local NVMe × 4 nodes).
 
 ## Observe
 

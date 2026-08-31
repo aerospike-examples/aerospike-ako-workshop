@@ -4,7 +4,7 @@
 |-------|-------|
 | Lab ID | `0.3` |
 | Section | Environment Setup |
-| EKS cluster | `${CLUSTER_NAME}` (default `my-cluster`) |
+| Cluster | `${CLUSTER_NAME}` (default `my-cluster`) |
 | AKO version | `${AKO_VERSION_START}` — default `4.2.0` |
 | cert-manager | `v1.14.4` |
 | Deploy path | B (Helm) |

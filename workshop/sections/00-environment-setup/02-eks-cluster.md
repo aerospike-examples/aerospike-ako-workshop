@@ -10,6 +10,8 @@
 | Duration | ~15–30 min |
 | Validation status | `draft` |
 
+**GKE path:** this guide is EKS-only. When `CLOUD_PROVIDER=gke`, use [02-gke-cluster.md](02-gke-cluster.md) (`./scripts/setup/02-bootstrap-gke.sh`). Running this script with a GKE env file fails on purpose.
+
 ## Takeaway
 
 EKS control plane in `us-east-1` spanning two availability zones. **Per-AZ workload pools** `${NODEGROUP_NAME}-<zone>` (2× `${MIN_NODES_PER_ZONE}` nodes each, `${NODE_TYPE}`) are created in step **0.2-nodes** before AKO install. Lab 1.1 re-ensures the same pools after full reset.
@@ -89,6 +91,7 @@ Reference config: [clusters/main-cluster.yaml](../../clusters/main-cluster.yaml)
 Cluster remains running. Proceed to AKO install (0.3). Workload nodes: step 0.2-nodes (or `./scripts/setup/setup-all.sh --step 0.2-nodes`).
 
 **Karpenter path:** see [02-eks-cluster-karpenter.md](02-eks-cluster-karpenter.md) when `NODE_PROVISIONING=karpenter`.
+**GKE path:** see [02-gke-cluster.md](02-gke-cluster.md) when `CLOUD_PROVIDER=gke`.
 
 ## Workshop artifacts
 

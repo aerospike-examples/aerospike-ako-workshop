@@ -1,6 +1,6 @@
 # AKO Workshop Walkthrough Guide
 
-Instructor-led walkthroughs for the **Aerospike Kubernetes Operator (AKO)** on **AWS EKS**.
+Instructor-led walkthroughs for the **Aerospike Kubernetes Operator (AKO)** on **AWS EKS** (default) or **GKE Standard**.
 
 ## Audience
 
@@ -30,14 +30,24 @@ See [instructor/path-selection-guide.md](instructor/path-selection-guide.md) and
 
 Labs use consistent terminology — see the [lab walkthrough template](_templates/lab-walkthrough.md#lab-structure) for **setup step**, **Phase 0 — Prepare lab**, **Phase 1–N**, **Steps**, **baseline/vertical pool**, and **full/light reset**.
 
+## Cloud provider
+
+| Provider | Config | Node strategy |
+|----------|--------|----------------|
+| **EKS** (default) | `CLOUD_PROVIDER=eks` — copy [workshop.env.example](scripts/env/workshop.env.example) | `eksctl` or `karpenter` |
+| **GKE Standard** | `CLOUD_PROVIDER=gke` — copy [workshop.env.gke.example](scripts/env/workshop.env.gke.example) | node pools only (`NODE_PROVISIONING=nodepool`) |
+
+GKE Autopilot and Karpenter-on-GCP are not supported.
+
 ## Node provisioning
 
 Pick **one** main-cluster node strategy at Section 0 (orthogonal to OLM/Helm):
 
 | Mode | Config | Lab 2.5 blocklist | Lab 2.6 cluster |
 |------|--------|---------------------|-----------------|
-| **eksctl MNG** (default) | `NODE_PROVISIONING=eksctl` | Supported | eksctl MNG |
-| **Karpenter** (optional) | `NODE_PROVISIONING=karpenter` | **Not supported** | eksctl MNG (unchanged) |
+| **eksctl MNG** (default on EKS) | `NODE_PROVISIONING=eksctl` | Supported | eksctl MNG |
+| **Karpenter** (EKS optional) | `NODE_PROVISIONING=karpenter` | **Not supported** | eksctl MNG (unchanged) |
+| **GKE node pools** | `NODE_PROVISIONING=nodepool` | Supported | GKE node pools |
 
 ## Version pins
 

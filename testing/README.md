@@ -1,7 +1,7 @@
 # AKO Workshop — Automated Lab Test Harness
 
 Scripted end-to-end checks that run the workshop labs against a **live EKS
-environment** and assert pass/fail, replacing the guides' interactive
+or GKE** environment and assert pass/fail, replacing the guides' interactive
 "watch until it looks done" steps with timeout-bound polling and assertions.
 
 ## Scope
@@ -33,8 +33,10 @@ testing/
 
 - A bootstrapped environment from `workshop/scripts/setup/setup-all.sh`
   (Section 0) and a configured `workshop/scripts/env/workshop.env`
-  (`DEPLOY_PATH`, `NODE_PROVISIONING`, AWS region, etc.).
-- `kubectl`, `helm`, `aws`, `openssl` on the workstation.
+  (`DEPLOY_PATH`, `NODE_PROVISIONING` / `CLOUD_PROVIDER`, region, etc.).
+- `kubectl`, `helm`, and the matching cloud CLI (`aws` or `gcloud`) on the workstation.
+
+GKE matrix cells (not mixed in the same `test-matrix.sh` run as EKS): `olm:gke` / `helm:gke` with `CLOUD_PROVIDER=gke` and `NODE_PROVISIONING=nodepool`.
 
 ## Usage
 

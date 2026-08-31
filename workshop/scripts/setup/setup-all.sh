@@ -31,6 +31,14 @@ STEP_SCRIPTS=(
 )
 STEP_LABS=("0.1" "0.2" "0.2 (nodes)" "0.3" "0.4" "0.5 (Part A)" "0.5 (Part B)" "0.6 (Part A)" "0.6 (Part B)" "0.7 (upgrade-lab)")
 
+MAIN_BOOTSTRAP_SCRIPT="02-bootstrap-eks.sh"
+UPGRADE_BOOTSTRAP_SCRIPT="upgrade-lab/00-bootstrap-eks.sh"
+if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+  MAIN_BOOTSTRAP_SCRIPT="02-bootstrap-gke.sh"
+  UPGRADE_BOOTSTRAP_SCRIPT="upgrade-lab/00-bootstrap-gke.sh"
+  STEP_SCRIPTS[1]="${MAIN_BOOTSTRAP_SCRIPT}"
+fi
+
 usage() {
   cat <<EOF
 Usage: $(basename "$0") [--list | --step NAME | --from NAME] [--skip-upgrade-lab] [--sequential]
@@ -142,19 +150,19 @@ run_parallel_bootstrap() {
   fi
 
   if [[ "${need_main}" == false && "${need_upgrade}" == false ]]; then
-    echo "Both EKS clusters already exist — merging kubeconfigs"
+    echo "Both $(provider_display_name) clusters already exist — merging kubeconfigs"
     merge_kubeconfig_into_default "${main_kc}"
     merge_kubeconfig_into_default "${upgrade_kc}"
     ensure_main_kubecontext
     return 0
   fi
 
-  echo "=== Parallel EKS bootstrap (main + upgrade-lab) ==="
+  echo "=== Parallel $(provider_display_name) bootstrap (main + upgrade-lab) ==="
 
   if [[ "${need_main}" == true ]]; then
     (
       run_with_log_prefix "[main-bootstrap]" \
-        env WORKSHOP_KUBECONFIG="${main_kc}" "${SETUP_DIR}/02-bootstrap-eks.sh"
+        env WORKSHOP_KUBECONFIG="${main_kc}" "${SETUP_DIR}/${MAIN_BOOTSTRAP_SCRIPT}"
     ) &
     pid_main=$!
   else
@@ -164,7 +172,7 @@ run_parallel_bootstrap() {
   if [[ "${need_upgrade}" == true ]]; then
     (
       run_with_log_prefix "[upgrade-bootstrap]" \
-        env WORKSHOP_KUBECONFIG="${upgrade_kc}" "${SETUP_DIR}/upgrade-lab/00-bootstrap-eks.sh"
+        env WORKSHOP_KUBECONFIG="${upgrade_kc}" "${SETUP_DIR}/${UPGRADE_BOOTSTRAP_SCRIPT}"
     ) &
     pid_upgrade=$!
   else
@@ -245,7 +253,7 @@ if [[ "${MODE}" == "step" ]]; then
     exit 1
   fi
   INDICES="$(resolve_step_indices "${STEP_ARG}")" || exit 1
-  echo "=== AKO Training Environment Setup (DEPLOY_PATH=${DEPLOY_PATH}, NODE_PROVISIONING=${NODE_PROVISIONING}) ==="
+echo "=== AKO Training Environment Setup (CLOUD_PROVIDER=${CLOUD_PROVIDER}, DEPLOY_PATH=${DEPLOY_PATH}, NODE_PROVISIONING=${NODE_PROVISIONING}) ==="
   for idx in ${INDICES}; do
     run_step "${idx}"
   done
@@ -264,12 +272,12 @@ if [[ "${MODE}" == "from" ]]; then
   fi
 fi
 
-echo "=== AKO Training Environment Setup (DEPLOY_PATH=${DEPLOY_PATH}, NODE_PROVISIONING=${NODE_PROVISIONING}) ==="
+echo "=== AKO Training Environment Setup (CLOUD_PROVIDER=${CLOUD_PROVIDER}, DEPLOY_PATH=${DEPLOY_PATH}, NODE_PROVISIONING=${NODE_PROVISIONING}) ==="
 if [[ "${SKIP_UPGRADE_LAB}" == true ]]; then
   echo "Note: skipping step 0.7-upgrade-lab (--skip-upgrade-lab)"
 fi
 if [[ "${SEQUENTIAL}" == true ]]; then
-  echo "Note: sequential EKS bootstrap (--sequential)"
+  echo "Note: sequential cluster bootstrap (--sequential)"
 fi
 
 if use_parallel_bootstrap; then

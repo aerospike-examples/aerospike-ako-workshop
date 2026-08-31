@@ -4,7 +4,7 @@
 |-------|-------|
 | Lab ID | `0.4` |
 | Section | Environment Setup |
-| EKS cluster | `my-cluster` |
+| Cluster | `${CLUSTER_NAME}` (default `my-cluster`) |
 | Deploy path | both |
 | Duration | ~10 min |
 | Validation status | `draft` |

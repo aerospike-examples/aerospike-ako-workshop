@@ -4,9 +4,13 @@ source "$(dirname "$0")/lib/common.sh"
 source "$(dirname "$0")/lib/nodepool-zones.sh"
 source "$(dirname "$0")/lib/karpenter-teardown.sh"
 load_env
-require_cmd eksctl
 require_cmd kubectl
-require_cmd aws
+if [[ "${CLOUD_PROVIDER}" == "eks" ]]; then
+  require_cmd eksctl
+  require_cmd aws
+else
+  require_cmd gcloud
+fi
 
 KARPENTER_IAM_TEARDOWN="$(dirname "$0")/setup/karpenter/99-teardown-controller-iam.sh"
 
@@ -14,7 +18,7 @@ usage() {
   cat <<EOF
 Usage: $(basename "$0") [--main-only | --upgrade-lab-only] [--yes] [--sequential]
 
-Delete EKS training cluster(s).
+Delete training cluster(s) ($(provider_display_name)).
 
 Default (no flags): delete BOTH clusters in parallel:
   - ${UPGRADE_LAB_CLUSTER_NAME} (upgrade-lab)
@@ -76,7 +80,12 @@ use_parallel_teardown() {
 
 print_teardown_plan() {
   echo "=== Teardown plan ==="
-  echo "Region: ${AWS_REGION}"
+  echo "Provider: $(provider_display_name) (${CLOUD_PROVIDER})"
+  if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+    echo "Region: ${GCP_REGION}  project: ${GCP_PROJECT}"
+  else
+    echo "Region: ${AWS_REGION}"
+  fi
   if use_parallel_teardown; then
     echo "Mode:   parallel delete"
   else
@@ -140,8 +149,8 @@ delete_cluster_async() {
     if is_karpenter_main_cluster "${name}"; then
       drain_karpenter_before_delete "${name}"
     fi
-    echo "[delete-${name}] Deleting EKS cluster ${name}..."
-    eksctl delete cluster --name "${name}" --region "${AWS_REGION}" --wait || exit 1
+    echo "[delete-${name}] Deleting $(provider_display_name) cluster ${name}..."
+    provider_delete_cluster "${name}" || exit 1
     echo "[delete-${name}] Deleted ${name}"
     if is_karpenter_main_cluster "${name}"; then
       sweep_orphan_karpenter_instances "${name}"
@@ -182,7 +191,7 @@ done
 if [[ ${#to_delete[@]} -eq 0 ]]; then
   echo "No clusters to delete."
 elif use_parallel_teardown; then
-  echo "=== Parallel EKS teardown ==="
+  echo "=== Parallel $(provider_display_name) teardown ==="
   pids=()
   for name in "${to_delete[@]}"; do
     delete_cluster_async "${name}" &

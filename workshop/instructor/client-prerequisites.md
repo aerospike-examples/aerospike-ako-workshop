@@ -14,9 +14,10 @@ This document applies to the **machine running the training** (instructor laptop
 
 | Tool | Path A | Path B | Min version | Verify |
 |------|:------:|:------:|-------------|--------|
-| AWS CLI | required | required | 2.x | `aws sts get-caller-identity` |
+| AWS CLI | required (EKS) | required (EKS) | 2.x | `aws sts get-caller-identity` |
+| gcloud | required (GKE) | required (GKE) | current | `gcloud auth print-access-token` |
 | kubectl | required | required | 1.28+ | `kubectl version --client` |
-| eksctl | required | required | 0.190+ | `eksctl version` |
+| eksctl | required (EKS) | required (EKS) | 0.190+ | `eksctl version` |
 | git | required | required | 2.x | `git --version` |
 | bash | required | required | 4.x | — |
 | curl | required | required | — | `curl --version` |
@@ -63,12 +64,24 @@ Set `IAM_PERMISSIONS_BOUNDARY_NAME` to your organization's boundary policy name 
 
 When the account is shared with other people, also set a unique `CLUSTER_NAME` (and `UPGRADE_LAB_CLUSTER_NAME`) before bootstrap — EKS cluster names, nodegroup names, and IAM role names are account-global. No lab needs IAM users, groups, or access keys, which such accounts typically deny.
 
+## GCP / GKE prerequisites
+
+Use [workshop.env.gke.example](../scripts/env/workshop.env.gke.example) (`CLOUD_PROVIDER=gke`). GKE **Standard** only — Autopilot cannot run the local-NVMe DaemonSet.
+
+| Requirement | Verify |
+|-------------|--------|
+| `gcloud` authenticated | `gcloud auth print-access-token` |
+| `GCP_PROJECT` set | `01-validate-client.sh` |
+| APIs enabled | `gcloud services enable container.googleapis.com compute.googleapis.com --project=$GCP_PROJECT` |
+| Quota: N2 CPUs + Local SSD GB in `${GCP_REGION}` | IAM/quotas console — baseline `n2-highmem-8` ×4 + vertical `n2-highmem-16` ×4 + upgrade-lab ×3 |
+| Unique `CLUSTER_NAME` in a shared project | GKE cluster names are project-global |
+
 ## Repo layout on client
 
 ```text
 aerospike-ako-workshop/
 └── workshop/
-    ├── scripts/env/workshop.env          # local copy from workshop.env.example
+    ├── scripts/env/workshop.env          # local copy from workshop.env.example (or workshop.env.gke.example)
     ├── secrets/features.conf             # NOT in git — instructor-supplied license
     ├── vendor/storage/                   # vendored storage manifests
     └── .kube/                            # isolated kubeconfigs (gitignored)
@@ -117,6 +130,7 @@ Minimum trainee tools: kubectl + shared kubeconfig, or read-only AWS if trainees
 ## Install links
 
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [gcloud](https://cloud.google.com/sdk/docs/install)
 - [eksctl](https://eksctl.io/installation/)
 - [krew](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)
 - [AKO scaling — Karpenter + local volumes](https://aerospike.com/docs/kubernetes/manage/configure/scaling)

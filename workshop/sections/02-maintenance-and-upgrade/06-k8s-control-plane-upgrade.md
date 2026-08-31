@@ -16,6 +16,8 @@
 
 A live Aerospike cluster keeps running during an EKS control plane upgrade — but you must still upgrade the node group afterward to align kubelet versions.
 
+**On GKE:** the same scripts call `gcloud container clusters upgrade` (control plane, then node pool). Versions look like `1.32.x-gke.y`; prefix match against `UPGRADE_LAB_K8S_VERSION_TARGET` is enough.
+
 EKS upgrade is **two phases**:
 
 1. **Control plane** — API server, etcd, and core controllers move to the target Kubernetes version. Worker nodes and Aerospike pods keep running on the old kubelet.

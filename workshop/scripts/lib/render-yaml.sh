@@ -24,5 +24,10 @@ unset _LIB_SELF
 render_workshop_yaml() {
   local file="$1"
   require_cmd envsubst
-  envsubst '$NODE_ZONE_A $NODE_ZONE_B' < "${file}"
+  if [[ "${CLOUD_PROVIDER:-eks}" == "gke" ]]; then
+    envsubst '$NODE_ZONE_A $NODE_ZONE_B' < "${file}" \
+      | sed "s/size: 512Gi/size: ${GKE_LOCAL_SSD_PVC_SIZE:-340Gi}/g"
+  else
+    envsubst '$NODE_ZONE_A $NODE_ZONE_B' < "${file}"
+  fi
 }

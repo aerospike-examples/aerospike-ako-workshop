@@ -9,6 +9,8 @@
 | Duration | ~40 min |
 | Validation status | `draft` |
 
+**GKE path:** Karpenter is EKS-only. When `CLOUD_PROVIDER=gke`, use [02-gke-cluster.md](02-gke-cluster.md).
+
 ## Takeaway
 
 A Karpenter-managed EKS cluster with a **system** managed nodegroup for the controller. **Per-AZ workload NodePools** `${KARPENTER_NODEPOOL_NAME}-<zone>` (4× `i8g.2xlarge` total) are created in step **0.2-nodes** before AKO install. Lab 1.2 Phase 2 adds **`${KARPENTER_NODEPOOL_VERTICAL_NAME}-<zone>`** (vertical pool) alongside the baseline pools.
@@ -128,6 +130,8 @@ If NodePool apply failed (e.g. `consolidationPolicy: Off`) or bootstrap pods sho
 ## Not covered here
 
 eksctl managed nodegroup path → [02-eks-cluster.md](02-eks-cluster.md)
+
+GKE Standard (no Karpenter) → [02-gke-cluster.md](02-gke-cluster.md)
 
 ## Workshop artifacts
 

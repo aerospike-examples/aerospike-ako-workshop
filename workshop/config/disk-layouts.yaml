@@ -1,11 +1,14 @@
 # Instance-type NVMe partition layouts for nvme-bootstrap DaemonSet.
 # Partitions are symlinked into /host/mnt/disks/ for local-volume-provisioner.
-# Devices are discovered via nvme-cli (Amazon EC2 NVMe Instance Storage) — not
-# hardcoded nvme names, which vary by instance type and root volume attachment.
+# Devices are discovered via nvme-cli (Amazon EC2 NVMe Instance Storage or
+# Google local NVMe) — not hardcoded nvme names.
 #
 # i8g.2xlarge:  1900 GB instance store — 3× 512 GiB partitions on first local SSD
 # i8g.4xlarge: 3750 GB instance store — 6× 512 GiB partitions on first local SSD
 # i8g.8xlarge: 2× local SSD — 6× 512 GiB partitions on each disk (12 total)
+# n2-highmem-8 / n2-highmem-16 (GKE): one GPT partition covering the entire
+#   local NVMe (no leftover overprovisioning). Partitioning still primes the
+#   disk (wipe GPT / blkdiscard path) before the provisioner publishes the PV.
 
 force_layout: ""  # optional override (workshop.env NVME_DISK_LAYOUT); empty = use IMDS instance-type
 
@@ -68,6 +71,22 @@ layouts:
       - number: 6
         start: 2560GiB
         end: 3072GiB  # same 6× 512 GiB per disk; remainder unallocated on each
+
+  n2-highmem-8:
+    instance_store: all
+    instance_store_devices: 2
+    partitions:
+      - number: 1
+        start: 0%
+        end: 100%
+
+  n2-highmem-16:
+    instance_store: all
+    instance_store_devices: 4
+    partitions:
+      - number: 1
+        start: 0%
+        end: 100%
 
   default:
     mode: whole-device

@@ -4,6 +4,13 @@ UPGRADE_DIR="$(dirname "$0")"
 source "${UPGRADE_DIR}/../../lib/common.sh"
 load_env
 apply_workshop_kubeconfig
+
+if [[ "${CLOUD_PROVIDER}" != "eks" ]]; then
+  echo "ERROR: 00-bootstrap-eks.sh requires CLOUD_PROVIDER=eks (got ${CLOUD_PROVIDER})" >&2
+  echo "For GKE run: ./scripts/setup/upgrade-lab/00-bootstrap-gke.sh" >&2
+  exit 1
+fi
+
 require_cmd eksctl
 
 : "${UPGRADE_LAB_NODEGROUP_NAME:=ng-upgrade-lab}"

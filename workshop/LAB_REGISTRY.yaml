@@ -2,10 +2,11 @@
 # Single source of truth for lab metadata, dependencies, and validation status.
 # Add new labs by copying _templates/lab-walkthrough.md and appending here.
 #
-# node_provisioning: orthogonal to deploy_paths — [eksctl] | [eksctl, karpenter]
+# node_provisioning: orthogonal to deploy_paths — [eksctl] | [eksctl, karpenter] | GKE: nodepool
+# cloud_providers: [eks, gke] unless a lab is EKS-only (Karpenter path)
 # deploy_paths: [kubectl] = Path A (OLM + kubectl apply); [helm] = Path B (Helm values)
-# Main-cluster labs support both unless noted. Lab 2.6 upgrade-lab is eksctl-only.
-# Lab 2.5 k8sNodeBlockList is eksctl-only (see eksctl_only_features).
+# Main-cluster labs support both unless noted. Lab 2.6 upgrade-lab is eksctl MNG on EKS, GKE node pools on GKE.
+# Lab 2.5 k8sNodeBlockList is supported on eksctl MNG and GKE node pools (not Karpenter).
 
 sections:
   - id: "00-environment-setup"
@@ -51,10 +52,12 @@ labs:
     section: "00-environment-setup"
     guide: sections/00-environment-setup/02-eks-cluster.md
     guide_karpenter: sections/00-environment-setup/02-eks-cluster-karpenter.md
+    guide_gke: sections/00-environment-setup/02-gke-cluster.md
     eks_cluster: my-cluster
     ako_min_version: null
     deploy_paths: [kubectl]
     node_provisioning: [eksctl, karpenter]
+    cloud_providers: [eks, gke]
     artifacts:
       kubectl: [clusters/main-cluster.yaml]
     artifacts_karpenter:
@@ -63,6 +66,7 @@ labs:
         - scripts/setup/karpenter/
     scripts:
       - scripts/setup/02-bootstrap-eks.sh
+      - scripts/setup/02-bootstrap-gke.sh
       - scripts/setup/karpenter/setup-all-karpenter.sh
     depends_on: ["0.1"]
     doc_urls:
