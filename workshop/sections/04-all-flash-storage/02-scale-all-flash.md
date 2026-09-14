@@ -9,7 +9,7 @@
 | AKO min version | `4.5.0` (`ALL_FLASH_AKO_VERSION`) |
 | Aerospike baseline | all-flash 3-node cluster from Lab 4.1 |
 | Deploy path | A (kubectl) / B (Helm) — follows `DEPLOY_PATH` |
-| Duration | ~15–20 min |
+| Duration | ~25–35 min |
 | Validation status | `draft` |
 | Official docs | [Scaling](https://aerospike.com/docs/kubernetes/manage/configure/scaling) · [AKO all-flash](https://aerospike.com/docs/kubernetes/manage/storage/all-flash) |
 
@@ -39,6 +39,18 @@ kubectl get nodes -l workshop.aerospike.com/node-pool=baseline
 ```
 
 **Expected:** phase `Completed`, `spec.size` 3, 3 nodes.
+
+## Load data (before scaling)
+
+Load **25M records × 100 bytes** on the 3-node cluster so scale-out migrations and the drop in `index_flash_used_bytes` are visible (~2–3 min). Tiny objects keep this an **index** workload: 25M primary-index entries, about 2.5 GB of payload.
+
+```bash
+./scripts/labs/load-data.sh --all-flash
+```
+
+The script targets `${ALL_FLASH_CLUSTER_NAME}` (not the main workshop cluster). Override count or size with `ALL_FLASH_LOAD_RECORDS` / `ALL_FLASH_LOAD_OBJECT_SIZE` in `workshop.env`.
+
+**Expected:** asbench Job completes; `asadm -e "info namespace"` shows roughly 25M objects in `test` (RF 2, so `objects` per node is a share of that). Capture `index_flash_used_bytes` now — it should drop after Step 4.
 
 ## Background
 
@@ -108,7 +120,7 @@ The overlay only sets `replicas: 4`; everything else still comes from the base v
 ./scripts/labs/scale-all-flash-cluster.sh
 ```
 
-Runs Steps 1–3 for your `DEPLOY_PATH` and finishes with the validation below.
+Loads 25M × 100 B records, then runs Steps 1–3 for your `DEPLOY_PATH`, and finishes with the validation below. Skip the load-data command above if you use this script.
 
 ### Step 4 — Watch reconciliation
 
@@ -120,7 +132,17 @@ kubectl -n aerospike get pods -w
 
 ## Verify (pass/fail)
 
-1. Validation script at the new size:
+1. Pre-scale object count (if you loaded data by hand, do this before Step 1):
+
+   ```bash
+   kubectl run asinfo-objects -n aerospike --restart=Never --rm -i \
+     --image=aerospike/aerospike-tools:latest -- \
+     asadm -h aerocluster -U admin -P admin123 -e "info namespace"
+   ```
+
+   **Pass:** `test` shows objects on the order of 25 million cluster-wide before the size bump.
+
+2. Validation script at the new size:
 
    ```bash
    ./scripts/labs/validate-all-flash.sh 4
@@ -128,7 +150,7 @@ kubectl -n aerospike get pods -w
 
    **Pass:** `All-flash validation: PASS` — phase `Completed`, 4 pods Running, `asinfo cluster-size=4`, index-type still `flash`.
 
-2. The new pod has both volume kinds:
+3. The new pod has both volume kinds:
 
    ```bash
    kubectl -n aerospike get pvc -l aerospike.com/cr=aerocluster \
@@ -138,7 +160,7 @@ kubectl -n aerospike get pods -w
 
    **Pass:** the 4th pod's claims include `local-ssd` data volumes and at least one `local-ssd-fs` index volume, all `Bound`.
 
-3. Migrations finish:
+4. Migrations finish:
 
    ```bash
    kubectl run asinfo-migrations -n aerospike --restart=Never --rm -i \
@@ -163,6 +185,7 @@ kubectl -n aerospike get pods -w
 | 4th pod crashes on start | `all-flash-sysctl` has not run there | `kubectl -n kube-system rollout status ds/all-flash-sysctl` |
 | Node pool will not grow past 3 | `maxSize` on the managed nodegroup | `ALL_FLASH_NODE_COUNT_SCALED` sets `maxSize` at create time; `eksctl scale nodegroup --nodes-max 4` fixes an existing one |
 | Migrations never settle | Still moving data | All-flash migrations are device-bound; give them time before declaring failure |
+| asbench Job hits the main cluster | Forgot `--all-flash` | `./scripts/lib/kubecontext.sh show` then `./scripts/labs/load-data.sh --all-flash` |
 
 ## Teardown / handoff
 
@@ -184,7 +207,7 @@ Scaling back down (4 → 3) works the same way in reverse, but the node pool kee
 
 - Path A: [manifests/all-flash-cluster.yaml](../../manifests/all-flash-cluster.yaml) · [manifests/all-flash-cluster-gke.yaml](../../manifests/all-flash-cluster-gke.yaml) (`spec.size` 3 → 4)
 - Path B: [helm/overlay-all-flash-scale-4-values.yaml](../../helm/overlay-all-flash-scale-4-values.yaml) over the base values
-- Scripts: [scale-all-flash-cluster.sh](../../scripts/labs/scale-all-flash-cluster.sh) · [ensure-nodegroup.sh](../../scripts/setup/all-flash/ensure-nodegroup.sh) · [validate-all-flash.sh](../../scripts/labs/validate-all-flash.sh)
+- Scripts: [load-data.sh](../../scripts/labs/load-data.sh) (`--all-flash`) · [scale-all-flash-cluster.sh](../../scripts/labs/scale-all-flash-cluster.sh) · [ensure-nodegroup.sh](../../scripts/setup/all-flash/ensure-nodegroup.sh) · [validate-all-flash.sh](../../scripts/labs/validate-all-flash.sh)
 
 ## References
 

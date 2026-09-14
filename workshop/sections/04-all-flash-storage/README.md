@@ -9,7 +9,7 @@ Run an Aerospike namespace whose **primary index lives on local NVMe** instead o
 | Lab | Title | Duration | Depends on |
 |-----|-------|----------|------------|
 | 4.1 | Deploy an all-flash cluster | ~25–35 min | Setup step 0.8 |
-| 4.2 | Scale an all-flash cluster | ~15–20 min | 4.1 |
+| 4.2 | Scale an all-flash cluster | ~25–35 min | 4.1 |
 
 See [LAB_REGISTRY.yaml](../../LAB_REGISTRY.yaml) for machine-readable metadata.
 

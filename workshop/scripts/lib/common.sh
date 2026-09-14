@@ -131,6 +131,9 @@ load_env() {
   fi
   # Section 4 is not on the Lab 2.2 upgrade ladder; install AKO at this pin.
   : "${ALL_FLASH_AKO_VERSION:=4.5.0}"
+  # Lab 4.2 seeds tiny records so the flash index (not the data device) is the story.
+  : "${ALL_FLASH_LOAD_RECORDS:=25000000}"
+  : "${ALL_FLASH_LOAD_OBJECT_SIZE:=100}"
   # Scripts shared with the main curriculum (06-setup-local-storage.sh) read
   # NODE_TYPE/NVME_DISK_LAYOUT. Apply the all-flash values here rather than in the
   # caller: helpers such as ensure_target_kubecontext re-run load_env, which would
@@ -139,6 +142,8 @@ load_env() {
     NODE_TYPE="${ALL_FLASH_NODE_TYPE}"
     NVME_DISK_LAYOUT="${ALL_FLASH_NVME_DISK_LAYOUT}"
     AKO_VERSION_START="${ALL_FLASH_AKO_VERSION}"
+    MIGRATION_LOAD_RECORDS="${ALL_FLASH_LOAD_RECORDS}"
+    MIGRATION_LOAD_OBJECT_SIZE="${ALL_FLASH_LOAD_OBJECT_SIZE}"
   fi
   : "${CLUSTER_STORAGE:=disk}"
   : "${CLUSTER_STORAGE_DIM_LABS:=}"

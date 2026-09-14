@@ -648,6 +648,7 @@ labs:
         - helm/overlay-all-flash-scale-4-values.yaml
     scripts:
       - scripts/labs/prepare-lab.sh
+      - scripts/labs/load-data.sh
       - scripts/labs/scale-all-flash-cluster.sh
       - scripts/setup/all-flash/ensure-nodegroup.sh
       - scripts/labs/validate-all-flash.sh

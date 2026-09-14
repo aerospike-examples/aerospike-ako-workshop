@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Lab 4.2 — scale the all-flash cluster (default 3 -> 4), growing the node pool first.
+# Lab 4.2 — scale the all-flash cluster (default 3 -> 4).
+# Seeds 25M × 100 B records, grows the node pool, then bumps spec.size.
 #
 # Usage: ./scripts/labs/scale-all-flash-cluster.sh [size]
 set -euo pipefail
@@ -13,11 +14,14 @@ SIZE="${1:-${ALL_FLASH_AEROSPIKE_SIZE_SCALED}}"
 
 echo "=== Scaling all-flash cluster to ${SIZE} pods (DEPLOY_PATH=${DEPLOY_PATH}) ==="
 
-# multiPodPerHost is false, so every pod needs its own node with its own NVMe slices.
-"${WORKSHOP_ROOT}/scripts/setup/all-flash/ensure-nodegroup.sh" "${SIZE}"
-
 export CLUSTER_NAME="${ALL_FLASH_CLUSTER_NAME}"
 ensure_all_flash_kubecontext
+
+echo "Loading ${ALL_FLASH_LOAD_RECORDS} × ${ALL_FLASH_LOAD_OBJECT_SIZE}B records so scale-out migrations are visible..."
+"${SCRIPT_DIR_LABS}/load-data.sh" --all-flash
+
+# multiPodPerHost is false, so every pod needs its own node with its own NVMe slices.
+"${WORKSHOP_ROOT}/scripts/setup/all-flash/ensure-nodegroup.sh" "${SIZE}"
 
 echo "Waiting for the new node's index and data PVs to be published..."
 source "${SCRIPT_DIR_LABS}/../lib/local-storage.sh"

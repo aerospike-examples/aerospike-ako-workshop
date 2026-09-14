@@ -2,7 +2,7 @@
 # testing/labs/4.2.sh — Lab 4.2: Scale an all-flash cluster (3 -> 4)
 #
 # Runs on the dedicated all-flash cluster and depends on 4.1 having deployed the
-# baseline. Grows the node pool, scales the CR, then re-asserts that the new pod
+# baseline. Seeds 25M × 100 B records, grows the node pool, scales the CR, then re-asserts that the new pod
 # got both its block data volumes and its filesystem index mounts.
 set -euo pipefail
 LAB_ID="4.2"
@@ -22,7 +22,7 @@ fi
 log_info "Baseline before scale:"
 kubectl -n "${NAMESPACE}" get pods -l aerospike.com/cr=aerocluster -o wide
 
-log_info "Scaling ${ALL_FLASH_AEROSPIKE_SIZE} -> ${ALL_FLASH_AEROSPIKE_SIZE_SCALED} all-flash pods..."
+log_info "Seeding ${ALL_FLASH_LOAD_RECORDS} records, then scaling ${ALL_FLASH_AEROSPIKE_SIZE} -> ${ALL_FLASH_AEROSPIKE_SIZE_SCALED} all-flash pods..."
 "${LABS}/scale-all-flash-cluster.sh" "${ALL_FLASH_AEROSPIKE_SIZE_SCALED}"
 
 wait_pods_running "aerospike.com/cr=aerocluster" "${ALL_FLASH_AEROSPIKE_SIZE_SCALED}" 1800
