@@ -56,8 +56,10 @@ else
   log_cluster_storage_choice "${LAB_ID}"
 fi
 
-SCRIPT_DIR="$(dirname "$0")"
-WORKSHOP_SCRIPTS="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Own variable rather than SCRIPT_DIR: common.sh owns that name and re-reads it
+# whenever load_env() runs (e.g. from ensure_*_kubecontext) to source provider.sh.
+SCRIPT_DIR_LABS="$(cd "$(dirname "$0")" && pwd)"
+WORKSHOP_SCRIPTS="$(cd "${SCRIPT_DIR_LABS}/.." && pwd)"
 UPGRADE_LAB_SETUP="${WORKSHOP_SCRIPTS}/setup/upgrade-lab/setup-upgrade-lab.sh"
 ALL_FLASH_SETUP="${WORKSHOP_SCRIPTS}/setup/all-flash/setup-all-flash.sh"
 
@@ -174,7 +176,7 @@ prepare_lab_2_6() {
   validate_lab_2_6_starting_state
 
   if [[ "${LOAD_DATA}" == true ]]; then
-    "${SCRIPT_DIR}/load-data.sh" --upgrade-lab
+    "${SCRIPT_DIR_LABS}/load-data.sh" --upgrade-lab
   fi
 
   echo "=== Lab 2.6 prepared ==="
@@ -182,9 +184,9 @@ prepare_lab_2_6() {
 
 deploy_cluster() {
   if [[ "${DEPLOY_PATH}" == "helm" ]]; then
-    "${SCRIPT_DIR}/deploy-cluster-helm.sh"
+    "${SCRIPT_DIR_LABS}/deploy-cluster-helm.sh"
   else
-    "${SCRIPT_DIR}/deploy-cluster.sh"
+    "${SCRIPT_DIR_LABS}/deploy-cluster.sh"
   fi
 }
 
@@ -228,9 +230,9 @@ validate_maintenance_image() {
 
 deploy_maintenance_cluster() {
   if [[ "${DEPLOY_PATH}" == "helm" ]]; then
-    "${SCRIPT_DIR}/deploy-cluster-maintenance-helm.sh"
+    "${SCRIPT_DIR_LABS}/deploy-cluster-maintenance-helm.sh"
   else
-    "${SCRIPT_DIR}/deploy-cluster-maintenance.sh"
+    "${SCRIPT_DIR_LABS}/deploy-cluster-maintenance.sh"
   fi
 }
 
@@ -342,17 +344,17 @@ validate_tls_secrets() {
 
 deploy_tls_standard() {
   if [[ "${DEPLOY_PATH}" == "helm" ]]; then
-    "${SCRIPT_DIR}/deploy-cluster-tls-standard-helm.sh"
+    "${SCRIPT_DIR_LABS}/deploy-cluster-tls-standard-helm.sh"
   else
-    "${SCRIPT_DIR}/deploy-cluster-tls-standard.sh"
+    "${SCRIPT_DIR_LABS}/deploy-cluster-tls-standard.sh"
   fi
 }
 
 deploy_tls_mtls() {
   if [[ "${DEPLOY_PATH}" == "helm" ]]; then
-    "${SCRIPT_DIR}/deploy-cluster-tls-mtls-helm.sh"
+    "${SCRIPT_DIR_LABS}/deploy-cluster-tls-mtls-helm.sh"
   else
-    "${SCRIPT_DIR}/deploy-cluster-tls-mtls.sh"
+    "${SCRIPT_DIR_LABS}/deploy-cluster-tls-mtls.sh"
   fi
 }
 
@@ -366,8 +368,8 @@ prepare_lab_3_1() {
   echo "Ensuring baseline node pool exists, then light reset to 8.1.0.x (PKI generated in lab steps)."
 
   ensure_main_kubecontext
-  "${SCRIPT_DIR}/lab-nodes.sh" "1.1" ensure
-  "${SCRIPT_DIR}/lab-nodes.sh" "1.1" validate
+  "${SCRIPT_DIR_LABS}/lab-nodes.sh" "1.1" ensure
+  "${SCRIPT_DIR_LABS}/lab-nodes.sh" "1.1" validate
 
   prepare_cluster_lab "3.1" \
     "Light reset redeploys plain-TCP baseline on 8.1.0.x — existing node pools are reused." \
@@ -528,7 +530,7 @@ prepare_lab_2_5() {
   validate_cluster_storage_engine "${expected_engine}"
 
   if [[ "${LOAD_DATA}" == true ]]; then
-    "${SCRIPT_DIR}/load-data.sh"
+    "${SCRIPT_DIR_LABS}/load-data.sh"
   fi
 
   echo "=== Lab 2.5 prepared ==="
@@ -583,7 +585,7 @@ prepare_lab_4_2() {
     "${WORKSHOP_SCRIPTS}/setup/all-flash/04-deploy-cluster.sh"
   fi
 
-  "${SCRIPT_DIR}/validate-all-flash.sh" "${ALL_FLASH_AEROSPIKE_SIZE}"
+  "${SCRIPT_DIR_LABS}/validate-all-flash.sh" "${ALL_FLASH_AEROSPIKE_SIZE}"
   echo "=== Lab 4.2 prepared (${ALL_FLASH_AEROSPIKE_SIZE}-pod all-flash baseline) ==="
 }
 
@@ -680,8 +682,8 @@ esac
 
 case "${LAB_ID}" in
   1.1|1.2|1.3|1.4)
-    "${SCRIPT_DIR}/lab-nodes.sh" "${LAB_ID}" ensure
-    "${SCRIPT_DIR}/lab-nodes.sh" "${LAB_ID}" validate
+    "${SCRIPT_DIR_LABS}/lab-nodes.sh" "${LAB_ID}" ensure
+    "${SCRIPT_DIR_LABS}/lab-nodes.sh" "${LAB_ID}" validate
     ;;
   *)
     echo "ERROR: unknown lab id: ${LAB_ID}" >&2
