@@ -36,7 +36,7 @@ rackConfig:
                 storageClass: local-ssd
                 volumeMode: Block
                 accessModes: ["ReadWriteOnce"]
-                size: 512Gi
+                size: 300Gi
           - name: ns2
             aerospike:
               path: /dev/data/local2
@@ -45,7 +45,7 @@ rackConfig:
                 storageClass: local-ssd
                 volumeMode: Block
                 accessModes: ["ReadWriteOnce"]
-                size: 512Gi
+                size: 300Gi
           - name: aerospike-config-secret
             source:
               secret:
@@ -80,7 +80,7 @@ rackConfig:
                 storageClass: local-ssd
                 volumeMode: Block
                 accessModes: ["ReadWriteOnce"]
-                size: 512Gi
+                size: 300Gi
           - name: ns2
             aerospike:
               path: /dev/data/local2
@@ -89,7 +89,7 @@ rackConfig:
                 storageClass: local-ssd
                 volumeMode: Block
                 accessModes: ["ReadWriteOnce"]
-                size: 512Gi
+                size: 300Gi
           - name: aerospike-config-secret
             source:
               secret:

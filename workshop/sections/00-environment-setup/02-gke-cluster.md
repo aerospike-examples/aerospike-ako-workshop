@@ -73,7 +73,7 @@ kubectl get nodes -l workshop.aerospike.com/node-pool=baseline
 
 - System pool has **no** `node-pool=baseline` label — Aerospike pods stay off it
 - nvme-bootstrap still **partitions** each local SSD as one `p1` covering 0–100% (prime/GPT; no leftover overprovisioning)
-- Lab 1.2/1.3 `512Gi` claims are rendered as `${GKE_LOCAL_SSD_PVC_SIZE}` (default `340Gi`) so they bind to ~349 Gi PVs
+- Lab 1.2/1.3 local-ssd claims are `250Gi` (v1) then `300Gi` (v2 / replacement) — both fit a ~349 Gi GKE local NVMe PV (and EKS 512 Gi partitions)
 
 ## Troubleshooting
 

@@ -13,7 +13,7 @@
 
 Block storage (`ssd` StorageClass) and local NVMe provisioning are ready for rack and device labs. NVMe disks are partitioned once per node; disk wiping is handled by the local provisioner and AKO init containers.
 
-**Section 1 rack labs (1.2, 1.3):** use hybrid storage — `ssd` for the workdir filesystem volume (EBS on EKS, Persistent Disk on GKE); `local-ssd` block volumes (`/dev/data/local1`, `/dev/data/local2`) for namespace device storage. Vertical scale uses 2 block PVCs per pod (`multiPodPerHost: false`): EKS `i8g.4xlarge` (6× 512 GiB partitions) or GKE `n2-highmem-16` (6× full-disk `p1`).
+**Section 1 rack labs (1.2, 1.3):** use hybrid storage — `ssd` for the workdir filesystem volume (EBS on EKS, Persistent Disk on GKE); `local-ssd` block volumes (`/dev/data/local1`, `/dev/data/local2`) for namespace device storage. Claims are `250Gi` (v1) then `300Gi` (v2 / replacement) so they bind on both EKS ~512 Gi partitions and GKE ~349 Gi full-disk PVs. Vertical scale uses 2 block PVCs per pod (`multiPodPerHost: false`): EKS `i8g.4xlarge` (6× 512 GiB partitions) or GKE `n2-highmem-16` (6× full-disk `p1`).
 
 ## Init responsibility split
 
@@ -27,7 +27,7 @@ Three layers handle local NVMe storage — each runs once at its lifecycle stage
 
 `ssd` workdir volumes (`storageClass: ssd`) use AKO defaults for filesystem PVCs and are unaffected by this split.
 
-**On GKE:** `05-setup-ebs-storage.sh` only applies StorageClass `ssd` (`pd.csi.storage.gke.io` / `pd-ssd`). Local NVMe still uses nvme-bootstrap: one GPT partition (`p1`, 0–100%) per disk — no leftover overprovisioning. Lab 1.2/1.3 `512Gi` claims render as `GKE_LOCAL_SSD_PVC_SIZE` (default `340Gi`).
+**On GKE:** `05-setup-ebs-storage.sh` only applies StorageClass `ssd` (`pd.csi.storage.gke.io` / `pd-ssd`). Local NVMe still uses nvme-bootstrap: one GPT partition (`p1`, 0–100%) per disk — no leftover overprovisioning. Rack lab PVC sizes are the same as EKS (`250Gi` / `300Gi`); no GKE rewrite.
 
 ## Prerequisites
 

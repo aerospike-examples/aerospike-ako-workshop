@@ -74,7 +74,6 @@ load_env() {
     : "${GKE_SYSTEM_NODE_COUNT:=2}"
     : "${GKE_LOCAL_SSD_COUNT:=3}"
     : "${GKE_LOCAL_SSD_COUNT_VERTICAL:=6}"
-    : "${GKE_LOCAL_SSD_PVC_SIZE:=340Gi}"
   else
     : "${NODE_PROVISIONING:=eksctl}"
   fi

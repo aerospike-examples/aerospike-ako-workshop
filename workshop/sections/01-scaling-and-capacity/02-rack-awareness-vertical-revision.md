@@ -112,7 +112,7 @@ kubectl get nodeclaims -w             # live watch — `-w` accepts one resource
 Change three things together in `rack-cluster-v2-revision.yaml`:
 
 1. **Node pool locator:** `nodeSelector` `baseline` → `vertical`
-2. **Rack revision:** `v1` → `v2` (adds `ns2` local-ssd block device)
+2. **Rack revision:** `v1` → `v2` (grows `ns` `250Gi` → `300Gi` and adds `ns2` at `300Gi`)
 3. **Pod resources:** `7` CPU / `57Gi` → `15` CPU / `115Gi`
 
 ### Path A — kubectl
@@ -171,7 +171,7 @@ kubectl -n aerospike get pvc -o wide
 | Pods Pending after vertical pool add                      | Expected until Phase 3 apply; verify `nodeSelector: baseline` still pins Phase 1 pods                                                                                                                                |
 | Pods Pending after revision apply                         | Re-run `lab-nodes.sh 1.2 validate --vertical`; check `kubectl describe pod` for node affinity / PVC binding                                                                                                          |
 | Missing `workshop.aerospike.com/node-pool` labels         | Re-run `lab-nodes.sh 1.2 ensure` (baseline) or `ensure --vertical`; for eksctl, labels are patched after scale                                                                                                       |
-| local-ssd PVC Pending (4xl)                               | Re-run `./scripts/labs/lab-nodes.sh 1.2 ensure --vertical` (waits for nvme-bootstrap, restarts provisioner only if PV count is short, validates PVs). Verify `kubectl get pv -o custom-columns=NAME:.metadata.name,CLASS:.spec.storageClassName --no-headers \| awk '$2 == "local-ssd"'` — expect ~6×512Gi per i8g.4xlarge node |
+| local-ssd PVC Pending (4xl)                               | Re-run `./scripts/labs/lab-nodes.sh 1.2 ensure --vertical` (waits for nvme-bootstrap, restarts provisioner only if PV count is short, validates PVs). Expect ~6 local-ssd PVs per vertical node (EKS ~512Gi partitions on i8g.4xlarge; GKE ~349Gi full-disk `p1` on n2-highmem-16). Claims are `300Gi`. |
 | Drain stuck on local-storage pods                         | Expected during migration; wait for AKO                                                                                                                                                                              |
 | EC2 quota exceeded during Phase 2                         | Request quota for 8× i8g (4× baseline idle + 4× vertical)                                                                                                                                                            |
 | Multi-AZ validation fails on vertical pool                | Re-run `./scripts/labs/lab-nodes.sh 1.2 ensure --vertical` — per-AZ vertical pools guarantee `${MIN_NODES_PER_ZONE}` nodes per zone                                                                                  |
