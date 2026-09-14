@@ -20,7 +20,7 @@ GKE Autopilot is **not** supported (the nvme-bootstrap DaemonSet needs privilege
 
 - Lab 0.1 complete (`CLOUD_PROVIDER=gke`, copy [`workshop.env.gke.example`](../../scripts/env/workshop.env.gke.example) → `workshop.env`)
 - `gcloud` authenticated; APIs `container.googleapis.com` and `compute.googleapis.com` enabled
-- Quota in `${CLUSTER_ZONES}` for `${NODE_COUNT}`× `${NODE_TYPE}` now and `${NODE_COUNT}`× `${NODE_TYPE_VERTICAL}` in Lab 1.2, plus Local SSD GB (`${GKE_LOCAL_SSD_COUNT}` × 375 GB per baseline node)
+- Quota in `${CLUSTER_ZONES}` for `${NODE_COUNT}`× `${NODE_TYPE}` now and `${NODE_COUNT}`× `${NODE_TYPE_VERTICAL}` in Lab 1.2, plus Local SSD (`${GKE_LOCAL_SSD_COUNT}` × 375 GiB per baseline node)
 
 ## Starting state
 
@@ -73,7 +73,7 @@ kubectl get nodes -l workshop.aerospike.com/node-pool=baseline
 
 - System pool has **no** `node-pool=baseline` label — Aerospike pods stay off it
 - nvme-bootstrap still **partitions** each local SSD as one `p1` covering 0–100% (prime/GPT; no leftover overprovisioning)
-- Lab 1.2/1.3 local-ssd claims are `250Gi` (v1) then `300Gi` (v2 / replacement) — both fit a ~349 Gi GKE local NVMe PV (and EKS 512 Gi partitions)
+- Lab 1.2/1.3 local-ssd claims are `250Gi` (v1) then `300Gi` (v2 / replacement) — both fit a ~375 GiB GKE local NVMe PV (and EKS 512 GiB partitions)
 
 ## Troubleshooting
 
@@ -82,7 +82,7 @@ kubectl get nodes -l workshop.aerospike.com/node-pool=baseline
 | `GCP_PROJECT` missing | Copy `workshop.env.gke.example` and set the project id |
 | Ran `02-bootstrap-eks.sh` with a GKE env | Expected — use `./scripts/setup/02-bootstrap-gke.sh` |
 | API not enabled | `gcloud services enable container.googleapis.com compute.googleapis.com --project=$GCP_PROJECT` |
-| Local SSD quota | Request Local SSD GB + N2 CPUs in `${GCP_REGION}` |
+| Local SSD quota | Request Local SSD + N2 CPUs in `${GCP_REGION}` |
 | Autopilot cluster | Delete and recreate with `02-bootstrap-gke.sh` (Standard only) |
 
 ## Teardown / handoff

@@ -8,8 +8,10 @@
 #   2. helm + eksctl
 #   3. helm + karpenter
 #
-# Lab 2.6 (K8s control plane upgrade) is out of scope — bootstrap always uses
-# --skip-upgrade-lab, so the upgrade-lab cluster is never created.
+# Lab 2.6 (K8s control plane upgrade) is out of scope — the upgrade-lab cluster is
+# opt-in (setup-all.sh --step 0.7 / --with-upgrade-lab) and is never created by a
+# default bootstrap. Section 4 (all-flash) is likewise out of scope: setup step
+# 0.8 is opt-in, so 4.1/4.2 are validated separately with ./testing/run-lab.sh.
 #
 # For each config: write workshop/scripts/env/workshop.env (DEPLOY_PATH /
 # NODE_PROVISIONING only — this is the one workshop-owned file every run

@@ -22,12 +22,15 @@ A second, self-contained cluster (EKS or GKE, same `CLOUD_PROVIDER` as the main 
 - `secrets/features.conf` present (same file as the main cluster)
 - Capacity for `${UPGRADE_LAB_NODE_COUNT}`× `${UPGRADE_LAB_NODE_TYPE}` in the upgrade-lab zone (`NODE_ZONE` / `UPGRADE_LAB_NODE_ZONE` on EKS; first `CLUSTER_ZONES` entry on GKE), on top of the main cluster's nodes
 
-## Starting state
+## Opt-in
 
-Either of:
+A default `setup-all.sh` run creates the **main cluster only**. Step 0.7 is never part of it — this second cluster exists solely for Lab 2.6:
 
-- **Default (parallel) run:** `setup-all.sh` already created the upgrade-lab cluster (eksctl or gcloud) alongside step 0.2, so only the post-bootstrap work remains
-- **Nothing yet:** no upgrade-lab cluster exists
+```bash
+./scripts/setup/setup-all.sh --step 0.7
+```
+
+`prepare-lab.sh 2.6` also bootstraps it when it is missing. To fold 0.7 into a full Section 0 run (main + upgrade-lab bootstrap in parallel), use `--with-upgrade-lab`.
 
 ## Steps
 
@@ -43,7 +46,7 @@ Either of:
    ./scripts/setup/upgrade-lab/setup-upgrade-lab.sh
    ```
 
-   [`setup-upgrade-lab.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab.sh) creates the cluster with [`00-bootstrap-eks.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-eks.sh) or [`00-bootstrap-gke.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-gke.sh) when it does not exist, or just re-ensures the node pool when it does, then hands off to the post-bootstrap script. A default full `setup-all.sh` skips straight to [`setup-upgrade-lab-post-bootstrap.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab-post-bootstrap.sh), because the parallel bootstrap already built the cluster.
+   [`setup-upgrade-lab.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab.sh) creates the cluster with [`00-bootstrap-eks.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-eks.sh) or [`00-bootstrap-gke.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-gke.sh) when it does not exist, or just re-ensures the node pool when it does, then hands off to the post-bootstrap script. `--with-upgrade-lab` on a full `setup-all.sh` run bootstraps the cluster in parallel with step 0.2, then skips straight to [`setup-upgrade-lab-post-bootstrap.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab-post-bootstrap.sh).
 
 2. Watch what the post-bootstrap script does — each stage is skipped when already satisfied, so re-runs are safe:
 
@@ -87,8 +90,9 @@ kubectl -n aerospike get aerospikecluster aerocluster
 
 | Symptom | Fix |
 |---------|-----|
-| Want to defer the cost | `./scripts/setup/setup-all.sh --skip-upgrade-lab`, then `./scripts/labs/prepare-lab.sh 2.6` before Lab 2.6. With that flag set, `--step 0.7` is refused |
-| Parallel bootstrap failed | Partial clusters may remain — `./scripts/cleanup-lab.sh --yes` resets, then re-run setup |
+| Cluster missing at Lab 2.6 | `./scripts/setup/setup-all.sh --step 0.7`, or `./scripts/labs/prepare-lab.sh 2.6` |
+| `--step 0.7` refused | You also passed `--skip-upgrade-lab`; drop that flag (0.7 is already off by default) |
+| Parallel bootstrap failed (`--with-upgrade-lab`) | Partial clusters may remain — `./scripts/cleanup-lab.sh --yes` resets, then re-run setup |
 | Node pool timeout | `ensure-nodegroup.sh` waits 900s then dumps nodes; check `${UPGRADE_LAB_NODE_TYPE}` capacity in the upgrade-lab zone |
 | `aerocluster` redeploying unexpectedly | `CLUSTER_STORAGE` (or a `CLUSTER_STORAGE_*_LABS` override for 2.6) changed since the last run, so the storage engine no longer matches |
 | kubectl still on the upgrade-lab cluster | `./scripts/lib/kubecontext.sh main` |

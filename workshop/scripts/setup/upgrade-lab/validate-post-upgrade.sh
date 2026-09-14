@@ -83,14 +83,16 @@ if [[ "${engine}" == device ]]; then
   echo "Block PVCs: ${pvc_count}"
 fi
 
+# cluster_size is a field of the `statistics` command; there is no cluster-size command.
 cluster_size="$(kubectl run "aerospike-tool-verify-$$" -n "${NAMESPACE}" --restart=Never \
   --image=aerospike/aerospike-tools:latest --rm -i -- \
-  asinfo -h aerocluster -U admin -P admin123 -v cluster-size 2>/dev/null | tr -d '[:space:]' || true)"
+  asinfo -h aerocluster -U admin -P admin123 -v statistics 2>/dev/null \
+  | tr ';' '\n' | sed -n 's/^cluster_size=//p' | tr -d '[:space:]' || true)"
 
 if [[ "${cluster_size}" == "${UPGRADE_LAB_AEROSPIKE_SIZE}" ]]; then
-  echo "OK  asinfo cluster-size=${cluster_size}"
+  echo "OK  asinfo cluster_size=${cluster_size}"
 else
-  echo "FAIL asinfo cluster-size=${cluster_size:-unknown} (expected ${UPGRADE_LAB_AEROSPIKE_SIZE})"
+  echo "FAIL asinfo cluster_size=${cluster_size:-unknown} (expected ${UPGRADE_LAB_AEROSPIKE_SIZE})"
   fail=1
 fi
 

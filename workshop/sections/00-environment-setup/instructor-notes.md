@@ -57,12 +57,13 @@
 - Why install AKO at 4.2.0 instead of latest? (Upgrade ladder Lab 2.2: 4.3.0 → 4.4.1 → 4.5.0)
 - OLM vs Helm tradeoffs — see path-selection-guide.md
 
-## Dual cluster
+## Dedicated clusters (off by default)
 
-Step **0.7** creates the upgrade-lab cluster (`my-cluster-k8s-upgrade`) by default for Lab 2.6 — see [Lab 0.7](07-upgrade-lab-cluster.md). It starts on Kubernetes `UPGRADE_LAB_K8S_VERSION_START` (**1.31**, upgraded to 1.32 in Lab 2.6) with pool `ng-upgrade-lab` (`UPGRADE_LAB_NODE_COUNT=3`× `${UPGRADE_LAB_NODE_TYPE}`). Extra cost during Sections 1–2 is ~3× `i8g.2xlarge` (EKS) or ~3× `n2-highmem-8` (GKE).
+Step **0.7** (Lab 2.6) and step **0.8** (Section 4) are **not** created by a default `setup-all.sh` run. Opt in with `--step 0.7` / `--with-upgrade-lab` and `--step 0.8` (or `prepare-lab.sh 2.6` / `4.1`). See [Lab 0.7](07-upgrade-lab-cluster.md) and [Lab 0.8](08-all-flash-cluster.md).
+
+The upgrade-lab cluster starts on Kubernetes `UPGRADE_LAB_K8S_VERSION_START` (**1.31**, upgraded to 1.32 in Lab 2.6) with pool `ng-upgrade-lab` (`UPGRADE_LAB_NODE_COUNT=3`× `${UPGRADE_LAB_NODE_TYPE}`). Extra cost while it is up is ~3× `i8g.2xlarge` (EKS) or ~3× `n2-highmem-8` (GKE).
 
 - **AKO on upgrade-lab is always OLM** — `upgrade-lab/01-install-ako.sh` calls the OLM installer regardless of `DEPLOY_PATH`, and `03-deploy-cluster.sh` deploys `aerocluster` with `kubectl apply`. Path B classes therefore see an OLM operator and a kubectl-applied cluster on this one cluster; call that out rather than letting trainees discover it in Lab 2.6.
-- **Parallel bootstrap:** default `setup-all.sh` creates main + upgrade-lab clusters in parallel after 0.1 (eksctl or gcloud, ~15–25 min saved), then completes 0.7 with `upgrade-lab/setup-upgrade-lab-post-bootstrap.sh`. Use `--sequential` for sequential bootstrap; `--step 0.7` runs the full `upgrade-lab/setup-upgrade-lab.sh` (bootstraps the cluster first if missing).
-- Skip with `./scripts/setup/setup-all.sh --skip-upgrade-lab` and run `./scripts/labs/prepare-lab.sh 2.6` before that lab
-- **Parallel teardown:** default `cleanup-lab.sh` deletes both clusters concurrently (~10–20 min saved). Use `--sequential` for serial delete.
+- **`--with-upgrade-lab`:** creates main + upgrade-lab clusters in parallel after 0.1, then completes 0.7 with `upgrade-lab/setup-upgrade-lab-post-bootstrap.sh`. Combine with `--sequential` to bootstrap main first. `--step 0.7` runs the full `upgrade-lab/setup-upgrade-lab.sh` (bootstraps the cluster first if missing).
+- **Parallel teardown:** default `cleanup-lab.sh` deletes every training cluster that exists concurrently (~10–20 min saved). Use `--sequential` for serial delete.
 - Scripts restore kubectl to `my-cluster` after step 0.7; use `./scripts/lib/kubecontext.sh show` to verify

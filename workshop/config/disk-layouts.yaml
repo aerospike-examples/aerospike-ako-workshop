@@ -1,18 +1,20 @@
-# Instance-type NVMe partition layouts for nvme-bootstrap DaemonSet.
-# Partitions are symlinked into /host/mnt/disks/ for local-volume-provisioner.
-# Devices are discovered via nvme-cli (Amazon EC2 NVMe Instance Storage or
-# Google local NVMe) — not hardcoded nvme names.
+# NVMe partition layouts for the nvme-bootstrap DaemonSet.
 #
-# i8g.2xlarge:  1900 GB instance store — 3× 512 GiB partitions on first local SSD
-# i8g.4xlarge: 3750 GB instance store — 6× 512 GiB partitions on first local SSD
-# i8g.8xlarge: 2× local SSD — 6× 512 GiB partitions on each disk (12 total)
-# n2-highmem-8 / n2-highmem-16 (GKE): one GPT partition covering the entire
-#   local NVMe (no leftover overprovisioning). Partitioning still primes the
-#   disk (wipe GPT / blkdiscard path) before the provisioner publishes the PV.
+# Keys match the instance type, unless force_layout / NVME_DISK_LAYOUT /
+# ALL_FLASH_NVME_DISK_LAYOUT selects another entry. Devices are discovered
+# with nvme-cli (EC2 instance store or GCE local NVMe), not hardcoded names.
+#
+# Publishing (local-volume-provisioner):
+#   default partitions  → symlink under /mnt/disks     → Block PV (local-ssd)
+#   partition.fstype    → symlink under /mnt/disks-fs  → Filesystem PV (local-ssd-fs)
+#                         kubelet formats (fsType ext4); nvme-bootstrap does not mkfs.
 
-force_layout: ""  # optional override (workshop.env NVME_DISK_LAYOUT); empty = use IMDS instance-type
+force_layout: ""  # workshop.env NVME_DISK_LAYOUT; empty = detect instance type
 
 layouts:
+  # --- Main curriculum (EKS) -------------------------------------------------
+
+  # 1900 GB instance store — 3× 512 GiB on the first local SSD.
   i8g.2xlarge:
     instance_store: first
     partitions:
@@ -26,6 +28,7 @@ layouts:
         start: 1024GiB
         end: 1536GiB
 
+  # 3750 GB instance store — 6× 512 GiB; remainder unallocated (overprovisioning).
   i8g.4xlarge:
     instance_store: all
     instance_store_devices: 1
@@ -49,6 +52,7 @@ layouts:
         start: 2560GiB
         end: 3072GiB  # remainder of device left unallocated for overprovisioning
 
+  # 2× local SSD — same 6× 512 GiB per disk (12 PVs); remainder unallocated.
   i8g.8xlarge:
     instance_store: all
     instance_store_devices: 2
@@ -72,6 +76,11 @@ layouts:
         start: 2560GiB
         end: 3072GiB  # same 6× 512 GiB per disk; remainder unallocated on each
 
+  # --- Main curriculum (GKE) -------------------------------------------------
+  # One GPT partition covering each local NVMe (no leftover). Partitioning still
+  # primes the disk (wipe GPT / blkdiscard) before the provisioner publishes.
+
+  # 2× Local SSD.
   n2-highmem-8:
     instance_store: all
     instance_store_devices: 2
@@ -80,6 +89,7 @@ layouts:
         start: 0%
         end: 100%
 
+  # 4× Local SSD.
   n2-highmem-16:
     instance_store: all
     instance_store_devices: 4
@@ -88,6 +98,54 @@ layouts:
         start: 0%
         end: 100%
 
+  # --- Section 4 all-flash (dedicated cluster only) --------------------------
+  # Selected by ALL_FLASH_NVME_DISK_LAYOUT, not instance type, so these shapes
+  # can still serve the main curriculum. Each disk: one index slice (fstype) +
+  # data slice(s) (raw block). Index slices are sized above the PVC claim so
+  # usable space after kubelet formats ext4 still covers mounts-budget.
+
+  # 1× 7500 GB (~6985 GiB usable).
+  #   640 GiB index (600 GiB claim) + 5× 1024 GiB data; ~1225 GiB unpartitioned.
+  i8ge.3xlarge-all-flash:
+    instance_store: all
+    instance_store_devices: 1
+    partitions:
+      - number: 1
+        start: 0%
+        end: 640GiB
+        fstype: ext4
+      - number: 2
+        start: 640GiB
+        end: 1664GiB
+      - number: 3
+        start: 1664GiB
+        end: 2688GiB
+      - number: 4
+        start: 2688GiB
+        end: 3712GiB
+      - number: 5
+        start: 3712GiB
+        end: 4736GiB
+      - number: 6
+        start: 4736GiB
+        end: 5760GiB
+
+  # 16× 375 GiB Local SSD.
+  #   Per disk: 40 GiB index (37.5 GiB claim) + remainder (~335 GiB) data.
+  #   16 × 37.5 GiB = 600 GiB index per node.
+  n2-highmem-16-all-flash:
+    instance_store: all
+    instance_store_devices: 16
+    partitions:
+      - number: 1
+        start: 0%
+        end: 40GiB
+        fstype: ext4
+      - number: 2
+        start: 40GiB
+        end: 100%
+
+  # Instance type has no named layout (e.g. i8ge.3xlarge without the all-flash key).
   default:
     mode: whole-device
     instance_store: all

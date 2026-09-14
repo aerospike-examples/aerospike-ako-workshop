@@ -14,6 +14,7 @@ Kubernetes administrators and platform engineers new to AKO.
 | [1 — Scaling & Capacity](sections/01-scaling-and-capacity/) | ~2–2.5 h |
 | [2 — Maintenance & Upgrade](sections/02-maintenance-and-upgrade/) | ~1.5–2 h |
 | [3 — Security & Authentication](sections/03-security-and-authentication/) | ~1.5–2 h |
+| [4 — All-flash Storage](sections/04-all-flash-storage/) (optional, dedicated cluster) | ~45 m–1 h |
 
 ## Deploy path selection
 
@@ -57,6 +58,7 @@ Pick **one** main-cluster node strategy at Section 0 (orthogonal to OLM/Helm):
 | Aerospike Database (post Lab 2.4) | **8.1.2** (`8.1.2.0` image tag) | `AEROSPIKE_UPGRADE_IMAGE` |
 | AKO (install) | 4.2.0 | `AKO_VERSION_START` |
 | AKO (post Lab 2.2) | 4.5.0 | `AKO_VERSION_TARGET` |
+| AKO (Section 4 all-flash) | 4.5.0 | `ALL_FLASH_AKO_VERSION` |
 | AKO cluster chart (Helm) | auto-detect installed operator | `AKO_CLUSTER_CHART_VERSION` (empty = auto) |
 | Kubernetes (main) | 1.33 (env-driven) | `K8S_VERSION` in [workshop.env.example](scripts/env/workshop.env.example) |
 
@@ -69,16 +71,17 @@ Pick **one** main-cluster node strategy at Section 0 (orthogonal to OLM/Helm):
 
 Update patch tags each workshop season to match [enterprise image tags](https://hub.docker.com/r/aerospike/aerospike-server-enterprise/tags).
 
-## Dual-cluster architecture
+## Cluster architecture
 
 | Cluster | Name | Purpose |
 |---------|------|---------|
-| **Main** | `my-cluster` | All labs except 2.6 (eksctl or Karpenter) |
-| **Upgrade lab** | `my-cluster-k8s-upgrade` | Lab 2.6 control plane upgrade only (**eksctl MNG always**) |
+| **Main** | `my-cluster` | All labs except 2.6 and Section 4 (eksctl or Karpenter) |
+| **Upgrade lab** (opt-in) | `my-cluster-k8s-upgrade` | Lab 2.6 control plane upgrade only (**eksctl MNG always**) |
+| **All-flash** (opt-in) | `my-cluster-all-flash` | Section 4 only — index-on-flash nodes (`i8ge.3xlarge` / `n2-highmem-16`, **eksctl MNG or GKE node pool always**) |
 
-**kubectl default context is `my-cluster`** for all labs except 2.6 demo steps. Use `./scripts/lib/kubecontext.sh show` to verify.
+**kubectl default context is `my-cluster`** for all labs except the 2.6 and Section 4 demo steps. Use `./scripts/lib/kubecontext.sh show` to verify.
 
-Step **0.7** creates the upgrade-lab cluster during Section 0 (skip with `--skip-upgrade-lab`). Tear down upgrade-lab after Lab 2.6 with `--upgrade-lab-only`; end-of-course use `./scripts/cleanup-lab.sh` to delete **both** clusters.
+Steps **0.7** and **0.8** are **opt-in** — `setup-all.sh` never creates those clusters by default. Run `--step 0.7` (or `--with-upgrade-lab`) for Lab 2.6, and `--step 0.8` for Section 4. Tear down upgrade-lab after Lab 2.6 with `--upgrade-lab-only` and all-flash after Lab 4.2 with `--all-flash-only`; end-of-course use `./scripts/cleanup-lab.sh` to delete **all** clusters.
 
 Lab tables use the actual EKS cluster name (`my-cluster`), not the role label "Main".
 
@@ -91,14 +94,18 @@ In the registry, `deploy_paths: [kubectl]` means **Path A** (OLM + `kubectl appl
 ### Recommended order
 
 ```text
-0.1 → 0.2 → 0.3 → 0.4 → 0.5 → 0.6 → 0.7
+0.1 → 0.2 → 0.3 → 0.4 → 0.5 → 0.6
 → 1.1 → 1.2 → 1.3
 → 2.1 → 2.2 (through AKO 4.5.0) → 1.4
-→ 2.3 → 2.4 → 2.5 → 2.6
+→ 2.3 → 2.4 → 2.5
 → 3.1 → 3.2 → 3.3 → 3.4 → 3.5
+optional, dedicated clusters: 0.7 → 2.6
+optional, dedicated cluster: 0.8 → 4.1 → 4.2
 ```
 
-Section **3** is part of the full curriculum (after **2.5**; Lab **3.1** light-resets the cluster for PKI/TLS). Lab **2.6** is optional and uses the upgrade-lab cluster — it may precede or follow Section 3.
+Section **3** is part of the full curriculum (after **2.5**; Lab **3.1** light-resets the cluster for PKI/TLS). Lab **2.6** is optional, off by default, and uses the upgrade-lab cluster — run setup **0.7** (or `prepare-lab.sh 2.6`) only when teaching it; it may precede or follow Section 3.
+
+Section **4** (all-flash) is optional, off by default, and fully self-contained on its own cluster: it only needs **0.6** plus setup step **0.8**, so it can be taught at any point after Section 0 without touching `my-cluster`.
 
 Note: Lab **1.4** (replication factor) requires AKO **4.4.0+** — run after **2.2** reaches 4.4.1 (or complete the full ladder to 4.5.0). Lab **2.3** (on-demand operations) requires AKO **4.4.0+**. Lab **2.4** (DB upgrade to 8.1.2.x) requires AKO **4.5.0+**.
 
@@ -107,7 +114,8 @@ Note: Lab **1.4** (replication factor) requires AKO **4.4.0+** — run after **2
 | ID | Title | Cluster | AKO min | Run after |
 |----|-------|---------|---------|-----------|
 | 0.1–0.6 | Environment setup (main cluster) | `my-cluster` | 4.2.0 (install) | — |
-| 0.7 | Upgrade-lab cluster (Lab 2.6) | `my-cluster-k8s-upgrade` | — | 0.6 |
+| 0.7 | Upgrade-lab cluster (Lab 2.6, opt-in) | `my-cluster-k8s-upgrade` | — | 0.6 |
+| 0.8 | All-flash cluster (Section 4, opt-in) | `my-cluster-all-flash` | **4.5.0** | 0.6 |
 | 1.1 | Horizontal scaling | `my-cluster` | 4.2.0 | 0.6 |
 | 1.2 | Rack awareness, vertical scale & revision | `my-cluster` | 4.2.0 | 1.1 |
 | 1.3 | Rack replacement | `my-cluster` | 4.2.0 | — (standalone) |
@@ -117,12 +125,14 @@ Note: Lab **1.4** (replication factor) requires AKO **4.4.0+** — run after **2
 | 2.3 | On-demand operations | `my-cluster` | 4.4.0 | 2.2 |
 | 2.4 | Upgrade Aerospike DB | `my-cluster` | **4.5.0** | 2.3 |
 | 2.5 | K8s node maintenance | `my-cluster` | **4.5.0** | 2.4 |
-| 2.6 | K8s control plane upgrade | `my-cluster-k8s-upgrade` | — | 0.7 |
+| 2.6 | K8s control plane upgrade (opt-in) | `my-cluster-k8s-upgrade` | — | 0.7 |
 | 3.1 | Generate PKI keys and certificates | `my-cluster` | 4.2.0 | 0.6 |
 | 3.2 | TLS only (encryption in transit) | `my-cluster` | 4.2.0 | 3.1 |
 | 3.3 | mTLS and PKI authentication | `my-cluster` | 4.2.0 | 3.2 |
 | 3.4 | Server certificate rotation | `my-cluster` | 4.2.0 | 3.3 |
 | 3.5 | Live client credential rotation | `my-cluster` | 4.2.0 | 3.4 |
+| 4.1 | Deploy an all-flash cluster | `my-cluster-all-flash` | **4.5.0** | 0.8 |
+| 4.2 | Scale an all-flash cluster | `my-cluster-all-flash` | **4.5.0** | 4.1 |
 
 ## Quick start (instructor)
 
@@ -140,25 +150,31 @@ source scripts/env/workshop.env
 ./scripts/setup/setup-all.sh --step 0.4
 ./scripts/setup/setup-all.sh --step 0.5
 ./scripts/setup/setup-all.sh --step 0.6
-./scripts/setup/setup-all.sh --step 0.7
 ```
 
-**Pre-staging shortcut** — all Section 0 steps in one command (parallel EKS bootstrap by default):
+Optional dedicated clusters (off by default):
+
+```bash
+./scripts/setup/setup-all.sh --step 0.7   # Lab 2.6
+./scripts/setup/setup-all.sh --step 0.8   # Section 4
+```
+
+**Pre-staging shortcut** — main-cluster Section 0 steps in one command:
 
 ```bash
 ./scripts/setup/setup-all.sh
 ```
 
-Skip the upgrade-lab cluster (defer to Lab 2.6):
+Include the Lab 2.6 upgrade-lab cluster in that run (parallel bootstrap with 0.2):
 
 ```bash
-./scripts/setup/setup-all.sh --skip-upgrade-lab
+./scripts/setup/setup-all.sh --with-upgrade-lab
 ```
 
-Sequential bootstrap (main EKS, then later upgrade-lab EKS):
+`--skip-upgrade-lab` is still accepted and is the default. Sequential bootstrap of main then upgrade-lab:
 
 ```bash
-./scripts/setup/setup-all.sh --sequential
+./scripts/setup/setup-all.sh --with-upgrade-lab --sequential
 ```
 
 ## Prerequisites
@@ -172,7 +188,7 @@ Before delivery, run every lab end-to-end on EKS. See [validation/README.md](val
 
 ## Upcoming sections
 
-Registered in `LAB_REGISTRY.yaml` as `future_sections` — not yet implemented:
+Registered in `LAB_REGISTRY.yaml` as `future_sections` (IDs 05–07) — not yet implemented:
 
 - Monitoring & Observability
 - Backup & Restore
@@ -275,6 +291,7 @@ kubectl akoctl collectinfo -n aerospike,operators --path /tmp/akoctl-lab
 | Remove database + all workload nodegroups/NodePools (keep EKS + AKO + storage) | `./scripts/reset-cluster.sh` |
 | Delete entire EKS cluster(s) | `./scripts/cleanup-lab.sh` (default: **both** clusters deleted **in parallel**; Karpenter path drains bootstrap + workload pools first, ~15 min) |
 | Delete upgrade-lab only (after Lab 2.6) | `./scripts/cleanup-lab.sh --upgrade-lab-only` |
+| Delete all-flash cluster only (after Lab 4.2) | `./scripts/cleanup-lab.sh --all-flash-only` |
 | Delete main cluster only | `./scripts/cleanup-lab.sh --main-only` |
 | Sequential dual-cluster delete | `./scripts/cleanup-lab.sh --sequential` |
 

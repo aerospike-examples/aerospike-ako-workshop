@@ -9,22 +9,27 @@ You can stand up a complete lab platform — cluster (EKS or GKE), AKO, storage 
 | Step | Guide | Duration |
 |------|-------|----------|
 | 0.1 | [Prerequisites](01-prerequisites.md) | ~15m |
-| 0.2 | Cluster — [EKS eksctl](02-eks-cluster.md) / [EKS Karpenter](02-eks-cluster-karpenter.md) / [GKE Standard](02-gke-cluster.md) | ~15–25m (parallel with 0.7 bootstrap) |
+| 0.2 | Cluster — [EKS eksctl](02-eks-cluster.md) / [EKS Karpenter](02-eks-cluster-karpenter.md) / [GKE Standard](02-gke-cluster.md) | ~15–25m |
 | 0.2-nodes | Baseline per-AZ workload pools | ~10–15m |
 | 0.3 | Install AKO — [OLM](03-install-ako-olm.md) or [Helm](03-install-ako-helm.md) | ~20m |
 | 0.4 | [akoctl](04-install-akoctl.md) | ~10m |
 | 0.5 | [Storage layer](05-storage-layer.md) | ~25m |
 | 0.6 | [Secrets and validation](06-secrets-and-validation.md) | ~10m |
-| 0.7 | [Upgrade-lab cluster (Lab 2.6)](07-upgrade-lab-cluster.md) | ~15–25m post-bootstrap (cluster bootstrap runs in parallel with 0.2) |
+| 0.7 | [Upgrade-lab cluster (Lab 2.6)](07-upgrade-lab-cluster.md) — **opt-in**, off by default | ~15–25m |
+| 0.8 | [All-flash cluster (Section 4)](08-all-flash-cluster.md) — **opt-in**, off by default | ~25–35m |
 
-## Parallel cluster bootstrap (default)
+## Dedicated clusters (off by default)
 
-Full `./scripts/setup/setup-all.sh` creates **main** and **upgrade-lab** clusters **in parallel** after step 0.1 (EKS via eksctl, or GKE via gcloud when `CLOUD_PROVIDER=gke`), using isolated kubeconfig files under `workshop/.kube/` (merged into your default kubeconfig when both finish). This saves roughly **15–25 minutes** vs sequential bootstrap.
+A default `./scripts/setup/setup-all.sh` run creates **only the main cluster** (steps 0.1–0.6). Lab 2.6 and Section 4 each need their own cluster and are not part of that run:
 
-- Disable with `./scripts/setup/setup-all.sh --sequential` (sequential bootstrap: 0.2, 0.2-nodes, then 0.3–0.6, then full 0.7)
-- Individual `--step` runs are unchanged (no parallel)
+```bash
+./scripts/setup/setup-all.sh --step 0.7   # Lab 2.6 upgrade-lab
+./scripts/setup/setup-all.sh --step 0.8   # Section 4 all-flash
+# or include 0.7 in a full run (main + upgrade-lab bootstrap in parallel):
+./scripts/setup/setup-all.sh --with-upgrade-lab
+```
 
-The parallel run creates the upgrade-lab cluster with [`upgrade-lab/00-bootstrap-eks.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-eks.sh) or [`upgrade-lab/00-bootstrap-gke.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-gke.sh) (from `CLOUD_PROVIDER`) alongside step 0.2, then finishes step 0.7 with [`upgrade-lab/setup-upgrade-lab-post-bootstrap.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab-post-bootstrap.sh). `--step 0.7` and `--sequential` instead run the full [`upgrade-lab/setup-upgrade-lab.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab.sh), which bootstraps the cluster first if it does not exist.
+`--step 0.7` runs the full [`upgrade-lab/setup-upgrade-lab.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab.sh), which bootstraps the cluster if it does not exist. `--with-upgrade-lab` creates the upgrade-lab cluster with [`upgrade-lab/00-bootstrap-eks.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-eks.sh) or [`upgrade-lab/00-bootstrap-gke.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-gke.sh) alongside step 0.2, then finishes 0.7 with [`upgrade-lab/setup-upgrade-lab-post-bootstrap.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab-post-bootstrap.sh). `--sequential` with `--with-upgrade-lab` bootstraps main first, then upgrade-lab. Individual `--step` runs are never parallel.
 
 | Choose Path A (OLM) when… | Choose Path B (Helm) when… |
 |---------------------------|------------------------------|
@@ -56,7 +61,16 @@ On EKS, Lab 2.6 upgrade-lab always uses eksctl MNG. On GKE it uses a GKE node po
 - Does **not** deploy an Aerospike cluster on the main cluster — labs deploy their own baseline
 - Does **not** cover scaling, upgrades, or maintenance — Sections 1 and 2
 
-Step **0.7** builds the separate upgrade-lab cluster for Lab 2.6 only. Unlike the main cluster it is a complete, ready-to-upgrade environment: AKO is installed **via OLM regardless of `DEPLOY_PATH`**, the same secrets as the main cluster are applied, local-ssd is provisioned when the resolved storage for lab 2.6 is `disk` (the `CLUSTER_STORAGE` default), and an `AerospikeCluster` named `aerocluster` is deployed with `kubectl apply`. Scripts restore your kubectl context to `${CLUSTER_NAME}` afterwards. Skip it with `./scripts/setup/setup-all.sh --skip-upgrade-lab` to save cost, then run `./scripts/labs/prepare-lab.sh 2.6` before that lab. Details: [Lab 0.7](07-upgrade-lab-cluster.md).
+Step **0.7** and step **0.8** are **not** part of a full `setup-all.sh` run. 0.7 builds the upgrade-lab cluster for Lab 2.6; 0.8 builds a third cluster for Section 4 (all-flash) on large NVMe instances. Run them only when you teach those optional labs:
+
+```bash
+./scripts/setup/setup-all.sh --step 0.7    # or prepare-lab.sh 2.6
+./scripts/setup/setup-all.sh --step 0.8    # or prepare-lab.sh 4.1
+```
+
+Unlike 0.7, step 0.8 **honors `DEPLOY_PATH`**, so Path A/B stay consistent through Labs 4.1–4.2. Details: [Lab 0.7](07-upgrade-lab-cluster.md), [Lab 0.8](08-all-flash-cluster.md).
+
+The upgrade-lab is a complete, ready-to-upgrade environment: AKO is installed **via OLM regardless of `DEPLOY_PATH`**, the same secrets as the main cluster are applied, local-ssd is provisioned when the resolved storage for lab 2.6 is `disk` (the `CLUSTER_STORAGE` default), and an `AerospikeCluster` named `aerocluster` is deployed with `kubectl apply`. Scripts restore your kubectl context to `${CLUSTER_NAME}` afterwards.
 
 ## Step-by-step setup (teaching flow)
 
@@ -75,7 +89,9 @@ source scripts/env/workshop.env
 ./scripts/setup/setup-all.sh --step 0.4
 ./scripts/setup/setup-all.sh --step 0.5    # ssd StorageClass + local NVMe
 ./scripts/setup/setup-all.sh --step 0.6    # secrets + validate
+# optional dedicated clusters (off by default):
 ./scripts/setup/setup-all.sh --step 0.7    # upgrade-lab (Lab 2.6) — see 07-upgrade-lab-cluster.md
+./scripts/setup/setup-all.sh --step 0.8    # all-flash cluster (Section 4) — see 08-all-flash-cluster.md
 ```
 
 Or invoke scripts directly:
@@ -107,11 +123,12 @@ See `./scripts/setup/setup-all.sh --list` for the full step → script mapping.
 | `0.6` | composite: `0.6-secrets` + `0.6-validate` |
 | `0.6-secrets` | [`07-deploy-secrets.sh`](../../scripts/setup/07-deploy-secrets.sh) |
 | `0.6-validate` | [`08-validate-environment.sh`](../../scripts/setup/08-validate-environment.sh) |
-| `0.7` / `0.7-upgrade-lab` | [`upgrade-lab/setup-upgrade-lab.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab.sh) |
+| `0.7` / `0.7-upgrade-lab` | [`upgrade-lab/setup-upgrade-lab.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab.sh) — opt-in, `--step`/`--from`/`--with-upgrade-lab` |
+| `0.8` / `0.8-all-flash` | [`all-flash/setup-all-flash.sh`](../../scripts/setup/all-flash/setup-all-flash.sh) — opt-in, `--step`/`--from` only |
 
 ```bash
 ./scripts/setup/setup-all.sh --step 0.5-ebs     # StorageClass ssd only, skip local NVMe
-./scripts/setup/setup-all.sh --from 0.5-local   # resume through 0.7
+./scripts/setup/setup-all.sh --from 0.5-local   # resume through 0.6
 ```
 
 ## Quick orchestration (pre-staging shortcut)
@@ -127,10 +144,12 @@ cp scripts/env/workshop.env.example scripts/env/workshop.env
 ./scripts/setup/setup-all.sh
 ```
 
-Skip the upgrade-lab cluster (defer to Lab 2.6):
+Lab 2.6 and Section 4 stay off. Opt in when you need them:
 
 ```bash
-./scripts/setup/setup-all.sh --skip-upgrade-lab
+./scripts/setup/setup-all.sh --with-upgrade-lab   # include 0.7 in this run
+./scripts/setup/setup-all.sh --step 0.7           # Lab 2.6 cluster only
+./scripts/setup/setup-all.sh --step 0.8           # Section 4 cluster only
 ```
 
 ## Instructor notes

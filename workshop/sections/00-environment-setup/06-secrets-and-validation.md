@@ -98,7 +98,8 @@ Secrets are deployed and the platform is validated — **no AerospikeCluster yet
 
 **Main cluster ready.** The script closes with `Run ./scripts/labs/prepare-lab.sh 1.1 to start Section 1 (full reset + re-ensure nodes)`.
 
-- Unless you passed `--skip-upgrade-lab`, finish [Lab 0.7 — upgrade-lab cluster](07-upgrade-lab-cluster.md) next
+- Optional: [Lab 0.7 — upgrade-lab cluster](07-upgrade-lab-cluster.md) if you will teach Lab 2.6 (`--step 0.7`)
+- Optional: [Lab 0.8 — all-flash cluster](08-all-flash-cluster.md) if you will teach Section 4 (`--step 0.8`)
 - Then proceed to [Section 1 — Scaling & Capacity](../01-scaling-and-capacity/README.md)
 
 ## Workshop artifacts

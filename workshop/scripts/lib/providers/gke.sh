@@ -277,6 +277,44 @@ provider_bootstrap_upgrade_lab() {
   provider_ensure_upgrade_lab_nodes
 }
 
+# All-flash node pool: ALL_FLASH_GKE_LOCAL_SSD_COUNT local NVMe disks per node, each
+# later split by nvme-bootstrap into an index (ext4) and a data (raw block) partition.
+provider_ensure_all_flash_nodes() {
+  local count="${1:-${ALL_FLASH_NODE_COUNT}}"
+  local zone="${ALL_FLASH_NODE_ZONE:-${NODE_ZONE:-${NODE_ZONE_A}}}"
+  provider_ensure_nodepool_in_zone \
+    "${ALL_FLASH_CLUSTER_NAME}" \
+    "${ALL_FLASH_NODEGROUP_NAME}" \
+    "${ALL_FLASH_NODE_TYPE}" \
+    "${zone}" \
+    "${count}" \
+    "baseline" \
+    "${ALL_FLASH_GKE_LOCAL_SSD_COUNT}"
+  _gke_label_all_flash_pool_nodes
+}
+
+_gke_label_all_flash_pool_nodes() {
+  local label_key
+  label_key="$(provider_node_pool_label_key)"
+  kubectl get nodes -l "${label_key}=${ALL_FLASH_NODEGROUP_NAME}" -o name 2>/dev/null \
+    | while read -r node; do
+        kubectl label "${node}" "workshop.aerospike.com/storage=all-flash" --overwrite
+      done
+}
+
+provider_bootstrap_all_flash() {
+  local name="${ALL_FLASH_CLUSTER_NAME}"
+  _gke_require
+  if provider_cluster_exists "${name}"; then
+    echo "GKE cluster ${name} already exists — skipping create"
+    provider_update_kubeconfig "${name}"
+  else
+    _gke_create_cluster_with_system_pool "${name}" "${K8S_VERSION}"
+    provider_update_kubeconfig "${name}"
+  fi
+  provider_ensure_all_flash_nodes
+}
+
 provider_validate_client() {
   _PROVIDER_FAIL=0
   _gke_check() {
@@ -301,8 +339,8 @@ provider_validate_client() {
       "Enable: gcloud services enable container.googleapis.com compute.googleapis.com --project=${GCP_PROJECT}"
   fi
 
-  echo "NOTE  GKE Standard quotas: N2 CPUs (baseline ${NODE_TYPE} + vertical ${NODE_TYPE_VERTICAL}) and Local SSD GB"
-  echo "      (${GKE_LOCAL_SSD_COUNT} disks/baseline node, ${GKE_LOCAL_SSD_COUNT_VERTICAL} disks/vertical node; 375 GB each)"
+  echo "NOTE  GKE Standard quotas: N2 CPUs (baseline ${NODE_TYPE} + vertical ${NODE_TYPE_VERTICAL}) and Local SSD"
+  echo "      (${GKE_LOCAL_SSD_COUNT} disks/baseline node, ${GKE_LOCAL_SSD_COUNT_VERTICAL} disks/vertical node; 375 GiB each)"
   echo "NOTE  Autopilot is not supported (local NVMe DaemonSet). Use GKE Standard."
 
   [[ "${_PROVIDER_FAIL}" -eq 0 ]]

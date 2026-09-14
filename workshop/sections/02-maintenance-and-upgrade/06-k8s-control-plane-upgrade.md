@@ -31,7 +31,7 @@ The upgrade-lab cluster is separate from `my-cluster`. Safe eviction enabled dur
 
 ## Prerequisites
 
-- Upgrade-lab cluster created during Section 0 step **0.7**, or pre-staged before this lab (see **Phase 0** below)
+- Upgrade-lab cluster created with setup step **0.7** (off by default — `./scripts/setup/setup-all.sh --step 0.7`, or `prepare-lab.sh 2.6` in Phase 0)
 - Lab 2.5 complete (conceptual — worker drain, migration, local storage)
 - `./scripts/lib/kubecontext.sh show` → upgrade-lab cluster before every command in this lab
 

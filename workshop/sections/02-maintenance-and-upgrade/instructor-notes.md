@@ -77,9 +77,9 @@ Pick **one** guide by `NODE_PROVISIONING` — [eksctl](05-k8s-node-maintenance.m
 
 ## Curriculum order
 
-Emphasize: **2.2 → 1.4 → 2.3–2.6**
+Emphasize: **2.2 → 1.4 → 2.3–2.5**. Lab **2.6** is optional and off by default.
 
 ## Skip paths
 
 - Pre-stage AKO at 4.5.0; demo one upgrade step only
-- Defer 2.6 if no budget for second cluster
+- Skip 2.6 unless you opted into setup step 0.7 — default `setup-all.sh` does not create the upgrade-lab cluster

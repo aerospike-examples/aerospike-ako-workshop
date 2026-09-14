@@ -1,0 +1,5 @@
+# Lab 4.2 overlay — scale the all-flash cluster from 3 to 4 pods (Path B).
+# Layer on top of helm/base-all-flash-cluster-values.yaml (EKS) or
+# helm/base-all-flash-cluster-gke-values.yaml (GKE). The 4th node must already
+# exist: ./scripts/setup/all-flash/ensure-nodegroup.sh 4
+replicas: 4

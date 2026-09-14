@@ -1,6 +1,8 @@
 # NVMe bootstrap for all database nodes — replaces manual node-shell loop.
-# Partitions instance-store NVMe per workshop/config/disk-layouts.yaml and symlinks
-# block devices into /mnt/disks for local-volume-provisioner.
+# Partitions instance-store NVMe per workshop/config/disk-layouts.yaml and
+# symlinks slices into /mnt/disks (Block, local-ssd) or /mnt/disks-fs
+# (Filesystem, local-ssd-fs). Index slices are left unformatted: kubelet
+# formats them when the AerospikeCluster PVC uses volumeMode: Filesystem.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -36,6 +38,9 @@ spec:
                       - i8g.4xlarge
                       - i8g.8xlarge
                       - i8g.2xlarge
+                      - i8ge.3xlarge     # Section 4 all-flash (EKS)
+                      - n2-highmem-8     # GKE
+                      - n2-highmem-16    # GKE (and Section 4 all-flash)
       initContainers:
         - name: init-nvme
           image: public.ecr.aws/amazonlinux/amazonlinux:2023
@@ -45,7 +50,8 @@ spec:
             - /bin/bash
             - -ec
             - |
-              if ! command -v parted >/dev/null || ! command -v nvme >/dev/null || ! python3 -c "import yaml" 2>/dev/null; then
+              if ! command -v parted >/dev/null || ! command -v nvme >/dev/null \
+                  || ! python3 -c "import yaml" 2>/dev/null; then
                 echo "Installing NVMe bootstrap packages (first run can take several minutes per node)..."
                 dnf install -y parted util-linux python3-pyyaml nvme-cli
               else
@@ -57,6 +63,8 @@ spec:
           volumeMounts:
             - name: host-mnt-disks
               mountPath: /host/mnt/disks
+            - name: host-mnt-disks-fs
+              mountPath: /host/mnt/disks-fs
             - name: host-bootstrap-state
               mountPath: /host/var/lib/workshop/nvme-bootstrap
             - name: host-dev
@@ -75,6 +83,10 @@ spec:
         - name: host-mnt-disks
           hostPath:
             path: /mnt/disks
+            type: DirectoryOrCreate
+        - name: host-mnt-disks-fs
+          hostPath:
+            path: /mnt/disks-fs
             type: DirectoryOrCreate
         - name: host-bootstrap-state
           hostPath:

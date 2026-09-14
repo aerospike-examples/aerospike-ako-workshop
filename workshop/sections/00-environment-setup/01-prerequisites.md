@@ -62,7 +62,7 @@ Presence and `--version` are what get verified — the script does not assert mi
 
    **EKS** also runs EC2 AZ capacity pre-flight for `${NODE_TYPE}` and `${NODE_TYPE_VERTICAL}` in every `AWS_ZONES` entry, plus **Running On-Demand G and VT** quota (`NODE_COUNT × 2` at Lab 1.2 peak). Re-run capacity only: `./scripts/setup/01b-check-ec2-capacity.sh`.
 
-   **GKE** checks `gcloud` auth, `GCP_PROJECT`, and the Container API. It prints quota hints (N2 CPUs, Local SSD GB) rather than dry-running instance creates.
+   **GKE** checks `gcloud` auth, `GCP_PROJECT`, and the Container API. It prints quota hints (N2 CPUs, Local SSD) rather than dry-running instance creates.
 
    **Sample EKS output:**
 

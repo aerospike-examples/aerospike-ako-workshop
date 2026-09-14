@@ -15,7 +15,8 @@ Run a full end-to-end walkthrough of every lab on a real EKS environment before 
 - Main cluster `my-cluster`:
   - **eksctl path:** baseline per-AZ pools from step 0.2-nodes; vertical pool in Lab 1.2 Phase 2; K8s version from `K8S_VERSION` (default 1.33)
   - **Karpenter path:** system MNG; per-AZ baseline NodePools from step 0.2-nodes; vertical pool `${KARPENTER_NODEPOOL_VERTICAL_NAME}-<zone>` in Lab 1.2 Phase 2 — see [karpenter-walkthrough.md](karpenter-walkthrough.md)
-- Upgrade-lab cluster `my-cluster-k8s-upgrade` (3× i8g.2xlarge; K8s versions from `UPGRADE_LAB_K8S_VERSION_*`) for Lab 2.6 only — **always eksctl MNG**
+- Upgrade-lab cluster `my-cluster-k8s-upgrade` (3× i8g.2xlarge; K8s versions from `UPGRADE_LAB_K8S_VERSION_*`) for Lab 2.6 only — **always eksctl MNG**, and only when validating that optional lab (setup step 0.7)
+- All-flash cluster `my-cluster-all-flash` (3→4× `i8ge.3xlarge` on EKS or `n2-highmem-16` + 16 Local SSDs on GKE) for Section 4 only — **always eksctl MNG / GKE node pool**, and only when validating that optional section (setup step 0.8)
 - Valid `features.conf` at path referenced in `scripts/setup/07-deploy-secrets.sh`
 - Both deploy paths (OLM/Helm) validated separately (or document N/A)
 - Both node provisioning paths (eksctl/Karpenter) validated separately for main cluster
@@ -38,6 +39,10 @@ Run a full end-to-end walkthrough of every lab on a real EKS environment before 
 
 # Lint: confirm every script's relative `source` path resolves
 ./scripts/validation/validate-script-paths.sh
+
+# Section 4 only: assert the running server has its index on flash
+./scripts/labs/validate-all-flash.sh          # 4.1 baseline (3 pods)
+./scripts/labs/validate-all-flash.sh 4        # after 4.2
 ```
 
 ## Recording results

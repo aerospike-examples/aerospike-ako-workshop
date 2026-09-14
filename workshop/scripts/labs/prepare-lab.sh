@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Prepare a lab: reset (Section 1), cluster staging (Labs 2.x/3.x), or upgrade-lab (Lab 2.6).
+# Prepare a lab: reset (Section 1), cluster staging (Labs 2.x/3.x), upgrade-lab (Lab 2.6),
+# or the all-flash cluster (Labs 4.1/4.2).
 #
 # Usage:
 #   ./scripts/labs/prepare-lab.sh <lab-id> [--dim|--disk] [--full|--light|--skip-reset] [--load-data]
@@ -42,12 +43,23 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+# Section 4 runs index-on-flash on its own cluster: neither --dim nor --disk applies.
+if [[ "${LAB_ID}" == 4.* && -n "${CLI_CLUSTER_STORAGE}" ]]; then
+  echo "ERROR: --dim/--disk do not apply to all-flash lab ${LAB_ID} (index-type flash)" >&2
+  exit 1
+fi
+
 export CLI_CLUSTER_STORAGE
-log_cluster_storage_choice "${LAB_ID}"
+if [[ "${LAB_ID}" == 4.* ]]; then
+  echo "Using cluster storage: all-flash (index-type flash on dedicated cluster)"
+else
+  log_cluster_storage_choice "${LAB_ID}"
+fi
 
 SCRIPT_DIR="$(dirname "$0")"
 WORKSHOP_SCRIPTS="$(cd "${SCRIPT_DIR}/.." && pwd)"
 UPGRADE_LAB_SETUP="${WORKSHOP_SCRIPTS}/setup/upgrade-lab/setup-upgrade-lab.sh"
+ALL_FLASH_SETUP="${WORKSHOP_SCRIPTS}/setup/all-flash/setup-all-flash.sh"
 
 restore_main_kubecontext() {
   if cluster_exists "${CLUSTER_NAME}"; then
@@ -522,6 +534,69 @@ prepare_lab_2_5() {
   echo "=== Lab 2.5 prepared ==="
 }
 
+prepare_lab_4_1() {
+  trap restore_main_kubecontext EXIT
+  source "${WORKSHOP_SCRIPTS}/lib/all-flash.sh"
+
+  echo "=== Prepare lab 4.1 (all-flash cluster ${ALL_FLASH_CLUSTER_NAME}) ==="
+
+  if ! cluster_exists "${ALL_FLASH_CLUSTER_NAME}"; then
+    if [[ "${RESET_OVERRIDE}" == "skip" ]]; then
+      echo "ERROR: all-flash cluster ${ALL_FLASH_CLUSTER_NAME} not found" >&2
+      exit 1
+    fi
+    echo "All-flash cluster not found — running setup step 0.8..."
+    "${ALL_FLASH_SETUP}"
+  else
+    echo "All-flash cluster ${ALL_FLASH_CLUSTER_NAME} already exists"
+  fi
+
+  ensure_all_flash_kubecontext
+  if [[ "${RESET_OVERRIDE}" != "skip" ]]; then
+    # Lab 4.1 deploys Aerospike; start with no CR (covers leftover from older 0.8).
+    if kubectl -n "${NAMESPACE}" get aerospikecluster aerocluster >/dev/null 2>&1; then
+      echo "Removing existing aerocluster so Lab 4.1 can deploy it..."
+      kubectl -n "${NAMESPACE}" delete aerospikecluster aerocluster --ignore-not-found
+      wait_for_cluster_gone 300 || true
+    fi
+    "${WORKSHOP_SCRIPTS}/setup/all-flash/03-setup-local-storage.sh"
+  fi
+
+  echo "=== Lab 4.1 prepared (deploy the cluster in the lab steps) ==="
+}
+
+prepare_lab_4_2() {
+  trap restore_main_kubecontext EXIT
+  source "${WORKSHOP_SCRIPTS}/lib/all-flash.sh"
+
+  echo "=== Prepare lab 4.2 (all-flash cluster ${ALL_FLASH_CLUSTER_NAME}) ==="
+
+  if ! cluster_exists "${ALL_FLASH_CLUSTER_NAME}"; then
+    echo "All-flash cluster not found — running setup step 0.8..."
+    "${ALL_FLASH_SETUP}"
+  fi
+
+  ensure_all_flash_kubecontext
+
+  if ! kubectl -n "${NAMESPACE}" get aerospikecluster aerocluster >/dev/null 2>&1; then
+    echo "No aerocluster on the all-flash cluster — deploying the Lab 4.1 baseline..."
+    "${WORKSHOP_SCRIPTS}/setup/all-flash/04-deploy-cluster.sh"
+  fi
+
+  "${SCRIPT_DIR}/validate-all-flash.sh" "${ALL_FLASH_AEROSPIKE_SIZE}"
+  echo "=== Lab 4.2 prepared (${ALL_FLASH_AEROSPIKE_SIZE}-pod all-flash baseline) ==="
+}
+
+if [[ "${LAB_ID}" == "4.1" ]]; then
+  prepare_lab_4_1
+  exit 0
+fi
+
+if [[ "${LAB_ID}" == "4.2" ]]; then
+  prepare_lab_4_2
+  exit 0
+fi
+
 if [[ "${LAB_ID}" == "2.6" ]]; then
   require_cmd aws
   prepare_lab_2_6
@@ -579,7 +654,7 @@ default_reset_for_lab() {
   case "$1" in
     1.1|1.2|1.3|1.4) echo "light" ;;
     *)
-      echo "ERROR: unknown lab id: $1 (expected 1.1–1.4, 2.1, 2.3, 2.4, 2.5, 2.6, or 3.1–3.5)" >&2
+      echo "ERROR: unknown lab id: $1 (expected 1.1–1.4, 2.1, 2.3, 2.4, 2.5, 2.6, 3.1–3.5, or 4.1–4.2)" >&2
       exit 1
       ;;
   esac

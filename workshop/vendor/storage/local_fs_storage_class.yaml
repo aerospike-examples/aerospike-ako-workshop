@@ -1,0 +1,10 @@
+# Filesystem-mode local NVMe, used by Section 4 for Aerospike index-type flash mounts.
+# PVs are discovered by local-volume-provisioner under /mnt/disks-fs from device
+# symlinks. volumeMode Filesystem + fsType ext4: kubelet formats on first bind.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "local-ssd-fs"
+provisioner: "kubernetes.io/no-provisioner"
+reclaimPolicy: Delete
+volumeBindingMode: "WaitForFirstConsumer"

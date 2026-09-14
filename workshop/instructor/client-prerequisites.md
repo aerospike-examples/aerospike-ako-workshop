@@ -73,7 +73,7 @@ Use [workshop.env.gke.example](../scripts/env/workshop.env.gke.example) (`CLOUD_
 | `gcloud` authenticated | `gcloud auth print-access-token` |
 | `GCP_PROJECT` set | `01-validate-client.sh` |
 | APIs enabled | `gcloud services enable container.googleapis.com compute.googleapis.com --project=$GCP_PROJECT` |
-| Quota: N2 CPUs + Local SSD GB in `${GCP_REGION}` | IAM/quotas console — baseline `n2-highmem-8` ×4 + vertical `n2-highmem-16` ×4 + upgrade-lab ×3 |
+| Quota: N2 CPUs + Local SSD in `${GCP_REGION}` | IAM/quotas console — baseline `n2-highmem-8` ×4 + vertical `n2-highmem-16` ×4 + upgrade-lab ×3 |
 | Unique `CLUSTER_NAME` in a shared project | GKE cluster names are project-global |
 
 ## Repo layout on client

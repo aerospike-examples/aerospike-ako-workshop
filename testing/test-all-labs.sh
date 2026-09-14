@@ -2,10 +2,14 @@
 # testing/test-all-labs.sh
 #
 # Single-configuration orchestrator: runs every non-optional lab from 1.1
-# through 3.5 (curriculum order, per workshop/LAB_REGISTRY.yaml — Lab 2.6 is
-# out of scope and never invoked) against whatever environment is already
-# bootstrapped (Section 0 / setup-all.sh) and configured (workshop.env).
+# through 3.5 (curriculum order, per workshop/LAB_REGISTRY.yaml — Labs 2.6 and
+# 4.1/4.2 are out of scope and never invoked) against whatever environment is
+# already bootstrapped (Section 0 / setup-all.sh) and configured (workshop.env).
 # Section 3 (3.1-3.5) is part of the curriculum and always runs.
+#
+# Section 4 (all-flash) runs on its own opt-in cluster, so it is not part of
+# this suite: bootstrap with setup-all.sh --step 0.8, then
+# ./testing/run-lab.sh 4.1 && ./testing/run-lab.sh 4.2.
 #
 # Usage:
 #   ./testing/test-all-labs.sh [--run-id <id>] [--resume]
@@ -25,8 +29,9 @@ set -uo pipefail
 TESTING_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Curriculum order for this automation, per workshop/LAB_REGISTRY.yaml
-# curriculum_order — starts at 1.1, runs Section 3 (3.1-3.5), and only skips
-# 2.6 (K8s control plane upgrade, tested separately on the upgrade-lab cluster).
+# curriculum_order — starts at 1.1, runs Section 3 (3.1-3.5), and skips the labs
+# that live on their own cluster: 2.6 (K8s control plane upgrade, upgrade-lab)
+# and 4.1/4.2 (all-flash, opt-in dedicated cluster).
 LAB_ORDER=(1.1 1.2 1.3 2.1 2.2 1.4 2.3 2.4 2.5 3.1 3.2 3.3 3.4 3.5)
 
 RUN_ID=""

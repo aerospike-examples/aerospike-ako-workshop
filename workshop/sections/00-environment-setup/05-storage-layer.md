@@ -13,7 +13,7 @@
 
 Block storage (`ssd` StorageClass) and local NVMe provisioning are ready for rack and device labs. NVMe disks are partitioned once per node; disk wiping is handled by the local provisioner and AKO init containers.
 
-**Section 1 rack labs (1.2, 1.3):** use hybrid storage — `ssd` for the workdir filesystem volume (EBS on EKS, Persistent Disk on GKE); `local-ssd` block volumes (`/dev/data/local1`, `/dev/data/local2`) for namespace device storage. Claims are `250Gi` (v1) then `300Gi` (v2 / replacement) so they bind on both EKS ~512 Gi partitions and GKE ~349 Gi full-disk PVs. Vertical scale uses 2 block PVCs per pod (`multiPodPerHost: false`): EKS `i8g.4xlarge` (6× 512 GiB partitions) or GKE `n2-highmem-16` (6× full-disk `p1`).
+**Section 1 rack labs (1.2, 1.3):** use hybrid storage — `ssd` for the workdir filesystem volume (EBS on EKS, Persistent Disk on GKE); `local-ssd` block volumes (`/dev/data/local1`, `/dev/data/local2`) for namespace device storage. Claims are `250Gi` (v1) then `300Gi` (v2 / replacement) so they bind on both EKS ~512 GiB partitions and GKE ~375 GiB full-disk PVs. Vertical scale uses 2 block PVCs per pod (`multiPodPerHost: false`): EKS `i8g.4xlarge` (6× 512 GiB partitions) or GKE `n2-highmem-16` (6× full-disk `p1`).
 
 ## Init responsibility split
 
@@ -106,7 +106,7 @@ Both EKS (eksctl and Karpenter) and GKE node pools use the same **`nvme-bootstra
    kubectl get pv -o custom-columns=NAME:.metadata.name,CLASS:.spec.storageClassName,CAPACITY:.spec.capacity.storage,STATUS:.status.phase --no-headers | awk '$2 == "local-ssd"'
    ```
 
-   **Expected:** One PV per partition symlink — **EKS:** 3× ~512Gi per i8g.2xlarge, 6× per i8g.4xlarge, 12× per i8g.8xlarge. **GKE:** 3× ~349Gi per n2-highmem-8, 6× per n2-highmem-16 (multiply by `${NODE_COUNT}` workload nodes).
+   **Expected:** One PV per partition symlink — **EKS:** 3× ~512Gi per i8g.2xlarge, 6× per i8g.4xlarge, 12× per i8g.8xlarge. **GKE:** 3× ~375Gi per n2-highmem-8, 6× per n2-highmem-16 (multiply by `${NODE_COUNT}` workload nodes).
 
 ## Disk layouts
 
@@ -117,8 +117,8 @@ Layouts are defined in [`config/disk-layouts.yaml`](../../config/disk-layouts.ya
 | i8g.2xlarge | 1900 GB | 3× 512 GiB on first instance-store NVMe (`p1`, `p2`, `p3`) |
 | i8g.4xlarge | 3750 GB | 6× 512 GiB on first instance-store NVMe (`p1`–`p6`) |
 | i8g.8xlarge | 2× local SSD | 6× 512 GiB per disk (`p1`–`p6` on each; 12 total) |
-| n2-highmem-8 | 3× 375 GB local NVMe | 1× full-disk `p1` per disk (3 PVs; no leftover) |
-| n2-highmem-16 | 6× 375 GB local NVMe | 1× full-disk `p1` per disk (6 PVs; no leftover) |
+| n2-highmem-8 | 3× 375 GiB local NVMe | 1× full-disk `p1` per disk (3 PVs; no leftover) |
+| n2-highmem-16 | 6× 375 GiB local NVMe | 1× full-disk `p1` per disk (6 PVs; no leftover) |
 | other | auto-detect | whole-device symlinks on all instance-store NVMe (fallback) |
 
 Override layout for testing with `NVME_DISK_LAYOUT=i8g.4xlarge` in `workshop.env`.
@@ -188,7 +188,7 @@ Optional demo after Part B (uses [`manifests/local-ssd-demo.yaml`](../../manifes
 | No partition symlinks | Confirm instance type in `disk-layouts.yaml`; check IMDS (EKS) or GCP metadata (GKE) from the node |
 | Cleanup controller not deleting PVCs | Verify `--storageclass-names=local-ssd` and controller pod logs |
 | Wrong partition count | Set `NVME_DISK_LAYOUT` or update `config/disk-layouts.yaml` |
-| Wrong PV sizes (stale partition table) | Delete local-ssd PVs and PVCs. On each affected node, remove bootstrap markers: `rm -rf /var/lib/workshop/nvme-bootstrap` (legacy: `/mnt/disks/.nvme-bootstrap`). Replace the node (fresh instance store / local SSD) or manually wipe GPT only when no PVs are bound. Re-run `06-setup-local-storage.sh`. Expect EKS ~512Gi slices (3× i8g.2xlarge, 6× i8g.4xlarge) or GKE ~349Gi full-disk `p1` (3× n2-highmem-8, 6× n2-highmem-16). |
+| Wrong PV sizes (stale partition table) | Delete local-ssd PVs and PVCs. On each affected node, remove bootstrap markers: `rm -rf /var/lib/workshop/nvme-bootstrap` (legacy: `/mnt/disks/.nvme-bootstrap`). Replace the node (fresh instance store / local SSD) or manually wipe GPT only when no PVs are bound. Re-run `06-setup-local-storage.sh`. Expect EKS ~512Gi slices (3× i8g.2xlarge, 6× i8g.4xlarge) or GKE ~375Gi full-disk `p1` (3× n2-highmem-8, 6× n2-highmem-16). |
 | nvme-bootstrap re-runs on every lab | Expected only when new workload nodes join the pool. Reused nodes skip bootstrap via markers in `/var/lib/workshop/nvme-bootstrap/`. |
 | Provisioner logs: `.nvme-bootstrap` filesystem mode | Harmless on old nodes until nvme-bootstrap re-runs; re-apply storage setup (`06-setup-local-storage.sh`) or restart nvme-bootstrap pods to migrate markers off `/mnt/disks`. |
 | Provisioner logs: `nvme0n1p1: no such file or directory` | Symlinks exist but provisioner cannot resolve `/dev` targets — re-apply `manifests/aerospike_local_volume_provisioner.yaml` (mounts host `/dev`) and restart the DaemonSet. Confirm nvme-bootstrap finished: `kubectl -n kube-system logs ds/nvme-bootstrap -c init-nvme --tail=30`. |

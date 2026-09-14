@@ -19,9 +19,9 @@ Section 0 complete. Run `./scripts/labs/prepare-lab.sh 2.1` before Lab 2.1 (clus
 | 2.4 | [Upgrade Aerospike DB](04-upgrade-aerospike-db.md) | `my-cluster` | ~20m | |
 | 2.5 | [K8s node maintenance (eksctl)](05-k8s-node-maintenance.md) | `my-cluster` | ~25m | `NODE_PROVISIONING=eksctl` |
 | 2.5 | [K8s node maintenance (Karpenter)](05-k8s-node-maintenance-karpenter.md) | `my-cluster` | ~25m (+15m add-on) | `NODE_PROVISIONING=karpenter` |
-| 2.6 | [K8s control plane upgrade](06-k8s-control-plane-upgrade.md) | `my-cluster-k8s-upgrade` | ~45–60m | |
+| 2.6 | [K8s control plane upgrade](06-k8s-control-plane-upgrade.md) | `my-cluster-k8s-upgrade` | ~45–60m | **Optional** — off by default |
 
-**Curriculum:** Complete **2.2** (through AKO 4.4.1 minimum), then run **[Lab 1.4](../01-scaling-and-capacity/04-replication-factor.md)** before continuing to 2.3–2.6.
+**Curriculum:** Complete **2.2** (through AKO 4.4.1 minimum), then run **[Lab 1.4](../01-scaling-and-capacity/04-replication-factor.md)** before continuing to 2.3–2.5. Lab **2.6** is optional; run `./scripts/setup/setup-all.sh --step 0.7` (or `prepare-lab.sh 2.6`) only when teaching it.
 
 ## Instructor notes
 

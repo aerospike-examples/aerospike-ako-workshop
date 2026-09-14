@@ -16,12 +16,13 @@ KARPENTER_IAM_TEARDOWN="$(dirname "$0")/setup/karpenter/99-teardown-controller-i
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [--main-only | --upgrade-lab-only] [--yes] [--sequential]
+Usage: $(basename "$0") [--main-only | --upgrade-lab-only | --all-flash-only] [--yes] [--sequential]
 
 Delete training cluster(s) ($(provider_display_name)).
 
-Default (no flags): delete BOTH clusters in parallel:
+Default (no flags): delete ALL training clusters in parallel (missing ones are skipped):
   - ${UPGRADE_LAB_CLUSTER_NAME} (upgrade-lab)
+  - ${ALL_FLASH_CLUSTER_NAME} (all-flash, Section 4)
   - ${CLUSTER_NAME} (main)
 
 If NODE_PROVISIONING=karpenter, deleting the main cluster also:
@@ -33,14 +34,16 @@ If NODE_PROVISIONING=karpenter, deleting the main cluster also:
 Options:
   --main-only          Delete main cluster only
   --upgrade-lab-only   Delete upgrade-lab cluster only (after Lab 2.6)
+  --all-flash-only     Delete all-flash cluster only (after Section 4)
   --yes                Skip confirmation prompt
-  --sequential         Delete both clusters one at a time (upgrade-lab, then main)
+  --sequential         Delete the clusters one at a time (upgrade-lab, all-flash, then main)
   -h, --help           Show this help
 EOF
 }
 
 main_only=false
 upgrade_only=false
+all_flash_only=false
 assume_yes=false
 sequential=false
 
@@ -48,6 +51,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --main-only) main_only=true ;;
     --upgrade-lab-only) upgrade_only=true ;;
+    --all-flash-only) all_flash_only=true ;;
     --yes) assume_yes=true ;;
     --sequential) sequential=true ;;
     -h|--help) usage; exit 0 ;;
@@ -60,18 +64,24 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-if [[ "${main_only}" == true && "${upgrade_only}" == true ]]; then
-  echo "ERROR: --main-only and --upgrade-lab-only are mutually exclusive" >&2
+selected=0
+[[ "${main_only}" == true ]] && selected=$((selected + 1))
+[[ "${upgrade_only}" == true ]] && selected=$((selected + 1))
+[[ "${all_flash_only}" == true ]] && selected=$((selected + 1))
+if [[ "${selected}" -gt 1 ]]; then
+  echo "ERROR: --main-only, --upgrade-lab-only, and --all-flash-only are mutually exclusive" >&2
   exit 1
 fi
 
 clusters=()
 if [[ "${upgrade_only}" == true ]]; then
   clusters=("${UPGRADE_LAB_CLUSTER_NAME}")
+elif [[ "${all_flash_only}" == true ]]; then
+  clusters=("${ALL_FLASH_CLUSTER_NAME}")
 elif [[ "${main_only}" == true ]]; then
   clusters=("${CLUSTER_NAME}")
 else
-  clusters=("${UPGRADE_LAB_CLUSTER_NAME}" "${CLUSTER_NAME}")
+  clusters=("${UPGRADE_LAB_CLUSTER_NAME}" "${ALL_FLASH_CLUSTER_NAME}" "${CLUSTER_NAME}")
 fi
 
 use_parallel_teardown() {

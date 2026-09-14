@@ -111,6 +111,35 @@ load_env() {
   : "${UPGRADE_LAB_NODE_COUNT:=3}"
   : "${UPGRADE_LAB_NODE_TYPE:=i8g.2xlarge}"
   : "${UPGRADE_LAB_AEROSPIKE_SIZE:=3}"
+  # All-flash cluster (Section 4 only) — dedicated cluster, opt-in setup step 0.8.
+  : "${ALL_FLASH_CLUSTER_NAME:=my-cluster-all-flash}"
+  : "${ALL_FLASH_NODEGROUP_NAME:=ng-all-flash}"
+  : "${ALL_FLASH_AEROSPIKE_SIZE:=3}"
+  : "${ALL_FLASH_AEROSPIKE_SIZE_SCALED:=4}"
+  : "${ALL_FLASH_NODE_COUNT:=${ALL_FLASH_AEROSPIKE_SIZE}}"
+  : "${ALL_FLASH_NODE_COUNT_SCALED:=${ALL_FLASH_AEROSPIKE_SIZE_SCALED}}"
+  # 600 GiB primary index per node: EKS one 640 GiB slice; GKE 16× 40 GiB slices.
+  : "${ALL_FLASH_INDEX_MOUNTS_BUDGET:=644245094400}"
+  if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+    : "${ALL_FLASH_NODE_TYPE:=n2-highmem-16}"
+    : "${ALL_FLASH_GKE_LOCAL_SSD_COUNT:=16}"
+    : "${ALL_FLASH_NVME_DISK_LAYOUT:=${ALL_FLASH_NODE_TYPE}-all-flash}"
+  else
+    : "${ALL_FLASH_NODE_TYPE:=i8ge.3xlarge}"
+    : "${ALL_FLASH_GKE_LOCAL_SSD_COUNT:=16}"
+    : "${ALL_FLASH_NVME_DISK_LAYOUT:=${ALL_FLASH_NODE_TYPE}-all-flash}"
+  fi
+  # Section 4 is not on the Lab 2.2 upgrade ladder; install AKO at this pin.
+  : "${ALL_FLASH_AKO_VERSION:=4.5.0}"
+  # Scripts shared with the main curriculum (06-setup-local-storage.sh) read
+  # NODE_TYPE/NVME_DISK_LAYOUT. Apply the all-flash values here rather than in the
+  # caller: helpers such as ensure_target_kubecontext re-run load_env, which would
+  # re-source workshop.env over a caller-side override.
+  if [[ "${CLUSTER_NAME}" == "${ALL_FLASH_CLUSTER_NAME}" ]]; then
+    NODE_TYPE="${ALL_FLASH_NODE_TYPE}"
+    NVME_DISK_LAYOUT="${ALL_FLASH_NVME_DISK_LAYOUT}"
+    AKO_VERSION_START="${ALL_FLASH_AKO_VERSION}"
+  fi
   : "${CLUSTER_STORAGE:=disk}"
   : "${CLUSTER_STORAGE_DIM_LABS:=}"
   : "${CLUSTER_STORAGE_DISK_LABS:=}"
@@ -551,10 +580,18 @@ ensure_upgrade_lab_kubecontext() {
   assert_kubecontext "${UPGRADE_LAB_CLUSTER_NAME}"
 }
 
+ensure_all_flash_kubecontext() {
+  load_env
+  ensure_kubecontext "${ALL_FLASH_CLUSTER_NAME}"
+  assert_kubecontext "${ALL_FLASH_CLUSTER_NAME}"
+}
+
 ensure_target_kubecontext() {
   load_env
   if [[ "${CLUSTER_NAME}" == "${UPGRADE_LAB_CLUSTER_NAME}" ]]; then
     ensure_upgrade_lab_kubecontext
+  elif [[ "${CLUSTER_NAME}" == "${ALL_FLASH_CLUSTER_NAME}" ]]; then
+    ensure_all_flash_kubecontext
   else
     ensure_main_kubecontext
   fi
