@@ -20,6 +20,14 @@ all_flash_values_path() {
   fi
 }
 
+all_flash_scale_manifest_path() {
+  if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+    echo "${WORKSHOP_ROOT}/manifests/all-flash-cluster-gke-scale-4.yaml"
+  else
+    echo "${WORKSHOP_ROOT}/manifests/all-flash-cluster-scale-4.yaml"
+  fi
+}
+
 all_flash_scale_overlay_path() {
   echo "${WORKSHOP_ROOT}/helm/overlay-all-flash-scale-4-values.yaml"
 }

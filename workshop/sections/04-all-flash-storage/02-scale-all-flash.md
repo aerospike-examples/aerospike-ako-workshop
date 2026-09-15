@@ -89,18 +89,16 @@ First partitioning on a fresh node takes several minutes — the init container 
 
 #### Path A — kubectl
 
-Edit `spec.size` from `3` to `4` in the manifest for your cloud and re-apply:
+Apply the dedicated scale-up manifest for your cloud (`spec.size: 4`, same volume layout as Lab 4.1):
 
 ```bash
-# manifests/all-flash-cluster.yaml (EKS) or manifests/all-flash-cluster-gke.yaml (GKE)
-kubectl apply -f manifests/all-flash-cluster.yaml
+# EKS
+kubectl apply -f manifests/all-flash-cluster-scale-4.yaml
+# GKE
+kubectl apply -f manifests/all-flash-cluster-gke-scale-4.yaml
 ```
 
-Or patch it in place without editing the file:
-
-```bash
-kubectl -n aerospike patch aerospikecluster aerocluster --type=merge -p '{"spec":{"size":4}}'
-```
+The two manifests declare different volume shapes (EKS 5 data + 1 index, GKE 16 + 16). Applying the Lab 4.1 EKS file onto a GKE cluster (or the reverse) is denied by the `vaerospikecluster.kb.io` webhook with `rack storage config cannot be updated`, because AKO treats `spec.storage.volumes` as immutable.
 
 **Expected:** `aerospikecluster.asdb.aerospike.com/aerocluster configured`.
 
@@ -205,7 +203,7 @@ Scaling back down (4 → 3) works the same way in reverse, but the node pool kee
 
 ## Workshop artifacts
 
-- Path A: [manifests/all-flash-cluster.yaml](../../manifests/all-flash-cluster.yaml) · [manifests/all-flash-cluster-gke.yaml](../../manifests/all-flash-cluster-gke.yaml) (`spec.size` 3 → 4)
+- Path A: [manifests/all-flash-cluster-scale-4.yaml](../../manifests/all-flash-cluster-scale-4.yaml) (EKS) · [manifests/all-flash-cluster-gke-scale-4.yaml](../../manifests/all-flash-cluster-gke-scale-4.yaml) (GKE)
 - Path B: [helm/overlay-all-flash-scale-4-values.yaml](../../helm/overlay-all-flash-scale-4-values.yaml) over the base values
 - Scripts: [load-data.sh](../../scripts/labs/load-data.sh) (`--all-flash`) · [scale-all-flash-cluster.sh](../../scripts/labs/scale-all-flash-cluster.sh) · [ensure-nodegroup.sh](../../scripts/setup/all-flash/ensure-nodegroup.sh) · [validate-all-flash.sh](../../scripts/labs/validate-all-flash.sh)
 

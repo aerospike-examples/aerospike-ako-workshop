@@ -30,8 +30,14 @@ ensure_all_flash_local_pvs "${SIZE}"
 if [[ "${DEPLOY_PATH}" == "helm" ]]; then
   "${SCRIPT_DIR_LABS}/deploy-all-flash-cluster-helm.sh" "$(all_flash_scale_overlay_path)"
 else
-  kubectl -n "${NAMESPACE}" patch aerospikecluster aerocluster \
-    --type=merge -p "{\"spec\":{\"size\":${SIZE}}}"
+  if [[ "${SIZE}" == "4" ]]; then
+    manifest="$(all_flash_scale_manifest_path)"
+    echo "Applying ${manifest#"${WORKSHOP_ROOT}/"}..."
+    kubectl apply -f "${manifest}"
+  else
+    kubectl -n "${NAMESPACE}" patch aerospikecluster aerocluster \
+      --type=merge -p "{\"spec\":{\"size\":${SIZE}}}"
+  fi
   all_flash_wait_for_cluster "${SIZE}"
 fi
 

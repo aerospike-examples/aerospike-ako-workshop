@@ -645,8 +645,8 @@ labs:
     opt_in_note: "Optional Section 4 — dedicated all-flash cluster (setup step 0.8)"
     artifacts:
       kubectl:
-        - manifests/all-flash-cluster.yaml
-        - manifests/all-flash-cluster-gke.yaml
+        - manifests/all-flash-cluster-scale-4.yaml
+        - manifests/all-flash-cluster-gke-scale-4.yaml
       helm:
         - helm/base-all-flash-cluster-values.yaml
         - helm/base-all-flash-cluster-gke-values.yaml

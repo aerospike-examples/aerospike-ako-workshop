@@ -117,7 +117,7 @@ The slices are larger than the claims so that after kubelet formats ext4 there i
    ./scripts/labs/deploy-all-flash-cluster.sh
    ```
 
-   The script picks the right manifest for `CLOUD_PROVIDER` and waits for reconciliation. The equivalent raw command is `kubectl apply -f manifests/all-flash-cluster.yaml`.
+   The script picks the right manifest for `CLOUD_PROVIDER` and waits for reconciliation. The equivalent raw command is `kubectl apply -f manifests/all-flash-cluster.yaml` on EKS, or `kubectl apply -f manifests/all-flash-cluster-gke.yaml` on GKE.
 
    **Expected:** `aerospikecluster.asdb.aerospike.com/aerocluster created`, then pods reaching Running one at a time.
 
@@ -218,7 +218,7 @@ Leave the cluster running for [Lab 4.2](02-scale-all-flash.md). When Section 4 i
 - Kernel settings: [manifests/all-flash-sysctl-daemonset.yaml](../../manifests/all-flash-sysctl-daemonset.yaml)
 - Disk layouts: [scripts/setup/nvme-bootstrap/disk-layouts.yaml](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml) (`i8ge.3xlarge-all-flash`, `n2-highmem-16-all-flash`)
 - Storage classes: [vendor/storage/local_storage_class.yaml](../../vendor/storage/local_storage_class.yaml) · [vendor/storage/local_fs_storage_class.yaml](../../vendor/storage/local_fs_storage_class.yaml)
-- Both CRs and both value files are generated — edit [scripts/labs/render-all-flash-manifests.py](../../scripts/labs/render-all-flash-manifests.py), not the YAML
+- Both CRs, both Lab 4.2 scale CRs, and both value files are generated — edit [scripts/labs/render-all-flash-manifests.py](../../scripts/labs/render-all-flash-manifests.py), not the YAML
 
 ## References
 

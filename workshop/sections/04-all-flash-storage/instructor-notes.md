@@ -34,7 +34,7 @@ The 600 GiB `mounts-budget` therefore has headroom for a node failure and for re
 - **The kernel settings are node-wide.** `vm.dirty_background_bytes=1` and `vm.dirty_expire_centisecs=1` make the kernel write back almost immediately, for every process on the node. That is fine on a dedicated all-flash cluster and is exactly why this section does not run on the main workshop cluster.
 - **Unprivileged only works with the DaemonSet.** Aerospike 6.3+ can run all-flash unprivileged *if* the kernel parameters are already set. If a pod crashes at startup complaining about best practices, check that the node carries `workshop.aerospike.com/storage=all-flash` so `all-flash-sysctl` scheduled there. Last-resort fallback: set `podSpec.aerospikeContainer.securityContext.privileged: true` and let the server set the values itself.
 - **Claims are smaller than slices on purpose.** After kubelet formats ext4, usable space must still cover `mounts-budget` (600 GiB), so the layouts cut 640 GiB (EKS) and 40 GiB (GKE) index slices.
-- **Do not hand-edit the CR or values files.** All four are generated; re-run `scripts/labs/render-all-flash-manifests.py` (`--check` in CI) after changing sizes or volume counts.
+- **Do not hand-edit the CR or values files.** Base CRs, Lab 4.2 scale CRs, and Helm bases are generated; re-run `scripts/labs/render-all-flash-manifests.py` (`--check` in CI) after changing sizes or volume counts.
 - **First boot is slow.** Pods format and warm index mounts on first start. A 10-minute rollout is normal; it is not a hang.
 - **Context drift.** Every script here switches to the all-flash cluster and restores the main context on exit. If a trainee interrupts a script mid-run, `./scripts/lib/kubecontext.sh main` puts them back.
 

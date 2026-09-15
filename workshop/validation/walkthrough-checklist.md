@@ -71,7 +71,7 @@ Skip this block unless the delivery includes Section 4; it runs entirely on `my-
 - [ ] **4.1 Path A** — `deploy-all-flash-cluster.sh` (kubectl, provider-specific manifest)
 - [ ] **4.1 Path B** — `deploy-all-flash-cluster-helm.sh` (provider-specific base values)
 - [ ] **4.2** Scale all-flash — 25M × 100 B records loaded first (`load-data.sh --all-flash`); node pool grows 3→4, new node's PVs published, CR size 4 reaches Completed, index still flash; `validate-all-flash.sh 4` PASS
-- [ ] **4.2 Path A** — `kubectl patch` size bump; **Path B** — `overlay-all-flash-scale-4-values.yaml`
+- [ ] **4.2 Path A** — `all-flash-cluster-scale-4.yaml` / `all-flash-cluster-gke-scale-4.yaml`; **Path B** — `overlay-all-flash-scale-4-values.yaml`
 - [ ] Teardown — `cleanup-lab.sh --all-flash-only` removes only the dedicated cluster; `my-cluster` context restored
 
 ## Path coverage
