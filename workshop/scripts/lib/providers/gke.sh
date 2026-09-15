@@ -238,7 +238,7 @@ provider_ensure_nodepool_in_zone() {
       --machine-type="${node_type}" \
       --node-locations="${zone}" \
       --num-nodes="${count}" \
-      --local-nvme-ssd-block-count="${ssd_count}" \
+      --local-nvme-ssd-block="count=${ssd_count}" \
       --disk-type=pd-ssd \
       --disk-size=50 \
       --node-labels="${labels}" \

@@ -52,7 +52,7 @@ Pick **one** cloud and **one** node strategy at Section 0 (orthogonal to OLM/Hel
 |-------------------------|-------------------------|------------------------------|
 | Teaching classic EKS nodegroups | Audience uses Karpenter in production | Delivering the workshop on GCP |
 | Demoing `k8sNodeBlockList` (Lab 2.5) | Teaching dynamic node provisioning | Same labs as EKS eksctl (no Autopilot) |
-| Simplest EKS bootstrap | Full main curriculum on autoscaled i8g | Local NVMe via `--local-nvme-ssd-block-count` |
+| Simplest EKS bootstrap | Full main curriculum on autoscaled i8g | Local NVMe via `--local-nvme-ssd-block=count=…` |
 
 On EKS, Lab 2.6 upgrade-lab always uses eksctl MNG. On GKE it uses a GKE node pool. Do not run `02-bootstrap-eks.sh` when `CLOUD_PROVIDER=gke` (or the reverse) — the scripts refuse the mismatch.
 

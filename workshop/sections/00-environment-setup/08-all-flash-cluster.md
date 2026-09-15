@@ -44,7 +44,7 @@ Or invoke the script directly:
 | AWS EKS | `i8ge.3xlarge` | 12 vCPU / 96 GiB | 1 × 7500 GB (~6985 GiB usable) | arm64 |
 | GCP GKE | `n2-highmem-16` | 16 vCPU / 128 GiB | 16 × 375 GiB Local SSD | amd64 |
 
-`i8ge.3xlarge` is not offered in every AZ — check availability in `NODE_ZONE` before the session. On GKE the node pool is created with `--local-nvme-ssd-block-count=16`, which attaches the disks as **raw NVMe block** devices; `--ephemeral-storage-local-ssd` would RAID them together for kubelet and make them unusable as Aerospike devices.
+`i8ge.3xlarge` is not offered in every AZ — check availability in `NODE_ZONE` before the session. On GKE the node pool is created with `--local-nvme-ssd-block=count=16`, which attaches the disks as **raw NVMe block** devices; `--ephemeral-storage-local-ssd` would RAID them together for kubelet and make them unusable as Aerospike devices.
 
 ## Steps
 

@@ -50,7 +50,7 @@ No GKE cluster, or existing cluster you intend to reuse.
    ./scripts/setup/02-ensure-workload-nodepool.sh
    ```
 
-   Same as EKS: execs `./scripts/labs/lab-nodes.sh 1.1 ensure`. Nodes are labelled `workshop.aerospike.com/node-pool=baseline`. Each pool attaches `${GKE_LOCAL_SSD_COUNT}` local NVMe disks (`--local-nvme-ssd-block-count`).
+   Same as EKS: execs `./scripts/labs/lab-nodes.sh 1.1 ensure`. Nodes are labelled `workshop.aerospike.com/node-pool=baseline`. Each pool attaches `${GKE_LOCAL_SSD_COUNT}` local NVMe disks (`--local-nvme-ssd-block=count=…`).
 
    **Expected:** `${NODE_COUNT}`× `${NODE_TYPE}` Ready across `${CLUSTER_ZONES}` (≥ `${MIN_NODES_PER_ZONE}` per zone).
 
