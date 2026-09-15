@@ -41,7 +41,17 @@ spec:
                       - i8g.2xlarge
                       - i8ge.3xlarge     # Section 4 all-flash (EKS)
                       - n2-highmem-8     # GKE
-                      - n2-highmem-16    # GKE (and Section 4 all-flash)
+                      - n2-highmem-16    # GKE
+                      - n2-highmem-32    # GKE
+                      - n2-standard-8    # GKE
+                      - n2-standard-16   # GKE
+                      - n2-standard-32   # GKE
+                      - n2d-highmem-8    # GKE 
+                      - n2d-highmem-16   # GKE 
+                      - n2d-highmem-32   # GKE 
+                      - n2d-standard-8   # GKE 
+                      - n2d-standard-16  # GKE
+                      - n2d-standard-32  # GKE 
       initContainers:
         - name: init-nvme
           image: public.ecr.aws/amazonlinux/amazonlinux:2023

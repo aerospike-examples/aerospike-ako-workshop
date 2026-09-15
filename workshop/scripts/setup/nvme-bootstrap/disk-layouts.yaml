@@ -80,19 +80,19 @@ layouts:
   # One GPT partition covering each local NVMe (no leftover). Partitioning still
   # primes the disk (wipe GPT / blkdiscard) before the provisioner publishes.
 
-  # 2× Local SSD.
-  n2-highmem-8:
+  # 4× Local SSD.
+  n2d-standard-16:
     instance_store: all
-    instance_store_devices: 2
+    instance_store_devices: 4
     partitions:
       - number: 1
         start: 0%
         end: 100%
 
   # 4× Local SSD.
-  n2-highmem-16:
+  n2d-standard-32:
     instance_store: all
-    instance_store_devices: 4
+    instance_store_devices: 8
     partitions:
       - number: 1
         start: 0%
@@ -133,7 +133,7 @@ layouts:
   # 16× 375 GiB Local SSD.
   #   Per disk: 40 GiB index (37.5 GiB claim) + remainder (~335 GiB) data.
   #   16 × 37.5 GiB = 600 GiB index per node.
-  n2-highmem-16-all-flash:
+  n2d-standard-32-all-flash:
     instance_store: all
     instance_store_devices: 16
     partitions:
