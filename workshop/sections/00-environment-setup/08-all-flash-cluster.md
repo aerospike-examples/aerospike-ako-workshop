@@ -125,6 +125,8 @@ The cluster stays up for Section 4. Delete it on its own afterwards:
 
 ## Workshop artifacts
 
+- **EKS** reference config: [clusters/all-flash-cluster.yaml](../../clusters/all-flash-cluster.yaml) (documentation only — bootstrap renders its own ClusterConfig)
+- **GKE:** [`00-bootstrap-gke.sh`](../../scripts/setup/all-flash/00-bootstrap-gke.sh) — no checked-in ClusterConfig
 - Scripts: [`scripts/setup/all-flash/`](../../scripts/setup/all-flash/)
 - Kernel settings: [manifests/all-flash-sysctl-daemonset.yaml](../../manifests/all-flash-sysctl-daemonset.yaml)
 - Layouts: [config/disk-layouts.yaml](../../config/disk-layouts.yaml) — `i8ge.3xlarge-all-flash`, `n2-highmem-16-all-flash`

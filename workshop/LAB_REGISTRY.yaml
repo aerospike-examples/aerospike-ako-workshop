@@ -195,6 +195,7 @@ labs:
     opt_in_note: "setup-all.sh does not create this cluster by default; run --step 0.8"
     artifacts:
       kubectl:
+        - clusters/all-flash-cluster.yaml
         - manifests/all-flash-sysctl-daemonset.yaml
         - config/disk-layouts.yaml
         - vendor/storage/local_fs_storage_class.yaml

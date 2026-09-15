@@ -1,0 +1,34 @@
+# eksctl ClusterConfig reference for all-flash (Section 4) — NOT applied directly.
+# Bootstrap uses K8S_VERSION from scripts/env/workshop.env via all-flash/00-bootstrap-eks.sh:
+#
+#   ALL_FLASH_CLUSTER_NAME    (default my-cluster-all-flash)
+#   ALL_FLASH_NODEGROUP_NAME  (default ng-all-flash)
+#   ALL_FLASH_NODE_TYPE       (default i8ge.3xlarge)
+#   ALL_FLASH_NODE_COUNT      (default 3 — Lab 4.1)
+#   ALL_FLASH_NODE_COUNT_SCALED (default 4 — Lab 4.2 maxSize)
+#   ALL_FLASH_NODE_ZONE       (optional; defaults to NODE_ZONE)
+#   SSH_PUBLIC_KEY            (nodegroup SSH via ensure-nodegroup.sh)
+#
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: my-cluster-all-flash
+  region: us-east-1
+  version: "1.33"
+availabilityZones:
+  - us-east-1c
+  - us-east-1d
+managedNodeGroups:
+  - name: ${ALL_FLASH_NODEGROUP_NAME}
+    instanceType: i8ge.3xlarge
+    desiredCapacity: 3
+    minSize: 3
+    maxSize: 4
+    availabilityZones:
+      - us-east-1c
+    labels:
+      workshop.aerospike.com/node-pool: baseline
+      workshop.aerospike.com/storage: all-flash
+    ssh:
+      allow: true
+      publicKeyName: ${SSH_PUBLIC_KEY}

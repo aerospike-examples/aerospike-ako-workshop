@@ -158,7 +158,7 @@ See [instructor-notes.md](instructor-notes.md).
 
 ## Workshop artifacts
 
-- **EKS** reference configs: [clusters/main-cluster.yaml](../../clusters/main-cluster.yaml) · [clusters/upgrade-lab-cluster.yaml](../../clusters/upgrade-lab-cluster.yaml) — documentation only. Bootstrap scripts render their own ClusterConfig from `workshop.env` and run `eksctl create cluster -f`; the Karpenter path is the one exception, applying [clusters/main-cluster-karpenter.yaml](../../clusters/main-cluster-karpenter.yaml) through `envsubst`.
+- **EKS** reference configs: [clusters/main-cluster.yaml](../../clusters/main-cluster.yaml) · [clusters/upgrade-lab-cluster.yaml](../../clusters/upgrade-lab-cluster.yaml) · [clusters/all-flash-cluster.yaml](../../clusters/all-flash-cluster.yaml) — documentation only. Bootstrap scripts render their own ClusterConfig from `workshop.env` and run `eksctl create cluster -f`; the Karpenter path is the one exception, applying [clusters/main-cluster-karpenter.yaml](../../clusters/main-cluster-karpenter.yaml) through `envsubst`.
 - **GKE** has no checked-in ClusterConfig — [`02-bootstrap-gke.sh`](../../scripts/setup/02-bootstrap-gke.sh) calls `gcloud` from [`workshop.env.gke.example`](../../scripts/env/workshop.env.gke.example). Guide: [02-gke-cluster.md](02-gke-cluster.md).
 - **Baseline Aerospike cluster (3 nodes)** — selected by `CLUSTER_STORAGE` (`disk` default, `dim` for in-memory), not a script flag:
   - Path A: [manifests/disk-cluster.yaml](../../manifests/disk-cluster.yaml) · [manifests/dim-cluster.yaml](../../manifests/dim-cluster.yaml)
