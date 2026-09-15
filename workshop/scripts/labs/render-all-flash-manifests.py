@@ -8,7 +8,7 @@ Path B value files are generated from the profiles below.
     ./scripts/labs/render-all-flash-manifests.py            # write all four files
     ./scripts/labs/render-all-flash-manifests.py --check    # fail if they are stale
 
-Volume sizing must stay under what config/disk-layouts.yaml provisions:
+Volume sizing must stay under what scripts/setup/nvme-bootstrap/disk-layouts.yaml provisions:
   EKS  i8ge.3xlarge-all-flash   5 × 1024 GiB data slices + 1 × 640 GiB ext4 index
   GKE  n2-highmem-16-all-flash  16 × ~335 GiB data slices + 16 × 40 GiB ext4 index
 """

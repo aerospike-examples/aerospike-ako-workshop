@@ -124,11 +124,12 @@ all_flash_validate_pvcs() {
   local expected_pods="${1:-${ALL_FLASH_AEROSPIKE_SIZE}}"
   local per_pod_data per_pod_index bound_data bound_index fail=0
 
-  per_pod_data="$(python3 "${WORKSHOP_ROOT}/scripts/setup/nvme-init.py" --expected-pvs-per-node \
-    --config "${WORKSHOP_ROOT}/config/disk-layouts.yaml" \
+  local nvme_dir="${WORKSHOP_ROOT}/scripts/setup/nvme-bootstrap"
+  per_pod_data="$(python3 "${nvme_dir}/nvme-init.py" --expected-pvs-per-node \
+    --config "${nvme_dir}/disk-layouts.yaml" \
     --instance-type "${ALL_FLASH_NVME_DISK_LAYOUT}" 2>/dev/null || echo 0)"
-  per_pod_index="$(python3 "${WORKSHOP_ROOT}/scripts/setup/nvme-init.py" --expected-index-mounts-per-node \
-    --config "${WORKSHOP_ROOT}/config/disk-layouts.yaml" \
+  per_pod_index="$(python3 "${nvme_dir}/nvme-init.py" --expected-index-mounts-per-node \
+    --config "${nvme_dir}/disk-layouts.yaml" \
     --instance-type "${ALL_FLASH_NVME_DISK_LAYOUT}" 2>/dev/null || echo 0)"
 
   local pvc_table

@@ -105,15 +105,23 @@ count_local_ssd_pvs() {
   kubectl get pv -o json | _local_ssd_pv_filter count
 }
 
+nvme_bootstrap_dir() {
+  echo "${WORKSHOP_ROOT}/scripts/setup/nvme-bootstrap"
+}
+
 disk_layouts_config() {
-  echo "${WORKSHOP_ROOT}/config/disk-layouts.yaml"
+  echo "$(nvme_bootstrap_dir)/disk-layouts.yaml"
+}
+
+nvme_init_script() {
+  echo "$(nvme_bootstrap_dir)/nvme-init.py"
 }
 
 expected_local_ssd_pvs_for_instance_type() {
   local instance_type="$1"
   local config script
   config="$(disk_layouts_config)"
-  script="${WORKSHOP_ROOT}/scripts/setup/nvme-init.py"
+  script="$(nvme_init_script)"
   if [[ -z "${instance_type}" || ! -f "${config}" || ! -f "${script}" ]]; then
     echo ""
     return 0
@@ -130,7 +138,7 @@ layout_mode_for_instance_type() {
   local instance_type="$1"
   local config script
   config="$(disk_layouts_config)"
-  script="${WORKSHOP_ROOT}/scripts/setup/nvme-init.py"
+  script="$(nvme_init_script)"
   if [[ -z "${instance_type}" || ! -f "${config}" || ! -f "${script}" ]]; then
     echo ""
     return 0
@@ -266,7 +274,7 @@ expected_index_mounts_per_node() {
   local instance_type="${ALL_FLASH_NVME_DISK_LAYOUT:-}"
   local config script
   config="$(disk_layouts_config)"
-  script="${WORKSHOP_ROOT}/scripts/setup/nvme-init.py"
+  script="$(nvme_init_script)"
   if [[ -z "${instance_type}" || ! -f "${config}" || ! -f "${script}" ]]; then
     echo ""
     return 0

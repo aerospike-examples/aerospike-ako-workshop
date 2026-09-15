@@ -41,7 +41,7 @@ The 600 GiB `mounts-budget` therefore has headroom for a node failure and for re
 ## Skip paths
 
 - Short on time or quota? Demo **4.1 only** and describe 4.2 — the scale mechanics are identical to Lab 1.1 apart from the node/PV prerequisite.
-- No budget for a third cluster? Walk through [manifests/all-flash-cluster.yaml](../../manifests/all-flash-cluster.yaml) and [config/disk-layouts.yaml](../../config/disk-layouts.yaml) as a reading exercise, side by side with `manifests/disk-cluster.yaml`. The DRAM-vs-flash contrast is the lesson; the cluster is the proof.
+- No budget for a third cluster? Walk through [manifests/all-flash-cluster.yaml](../../manifests/all-flash-cluster.yaml) and [scripts/setup/nvme-bootstrap/disk-layouts.yaml](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml) as a reading exercise, side by side with `manifests/disk-cluster.yaml`. The DRAM-vs-flash contrast is the lesson; the cluster is the proof.
 
 ## Contrast to reach for
 

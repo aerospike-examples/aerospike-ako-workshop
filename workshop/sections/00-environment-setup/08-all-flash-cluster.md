@@ -77,7 +77,7 @@ Or invoke the script directly:
 
 ## What the storage layer does differently here
 
-`06-setup-local-storage.sh` detects the all-flash cluster by name and switches to `ALL_FLASH_NVME_DISK_LAYOUT` instead of the instance type's main-curriculum layout. That layout marks one partition per disk with `fstype: ext4`, and [`nvme-init.py`](../../scripts/setup/nvme-init.py) then:
+`06-setup-local-storage.sh` detects the all-flash cluster by name and switches to `ALL_FLASH_NVME_DISK_LAYOUT` instead of the instance type's main-curriculum layout. That layout marks one partition per disk with `fstype: ext4`, and [`nvme-init.py`](../../scripts/setup/nvme-bootstrap/nvme-init.py) then:
 
 - symlinks that partition into `/mnt/disks-fs/<device>p<n>` (Filesystem discovery dir)
 - symlinks the remaining partitions into `/mnt/disks` as before
@@ -106,7 +106,7 @@ kubectl -n aerospike get aerospikecluster
 | Symptom | Fix |
 |---------|-----|
 | No `local-ssd-fs` PVs | `kubectl -n kube-system logs ds/nvme-bootstrap -c init-nvme --tail=40` — look for `symlink ... /mnt/disks-fs/`; then `kubectl -n aerospike rollout restart ds/local-volume-provisioner` |
-| `nvme-bootstrap` not scheduled | Its node affinity lists instance types; `${ALL_FLASH_NODE_TYPE}` must be in [`nvme-bootstrap-daemonset.yaml`](../../scripts/setup/nvme-bootstrap-daemonset.yaml) |
+| `nvme-bootstrap` not scheduled | Its node affinity lists instance types; `${ALL_FLASH_NODE_TYPE}` must be in [`nvme-bootstrap-daemonset.yaml`](../../scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml) |
 | Pods crash on start | `kubectl -n kube-system logs ds/all-flash-sysctl -c set-sysctls` — all five `vm.*` values must be set on that node |
 | `i8ge.3xlarge` capacity error | Pick another zone with `NODE_ZONE` / `ALL_FLASH_NODE_ZONE`, or change `ALL_FLASH_NODE_TYPE` (and add a matching layout key) |
 | Want it gone | `./scripts/cleanup-lab.sh --all-flash-only` |
@@ -129,7 +129,7 @@ The cluster stays up for Section 4. Delete it on its own afterwards:
 - **GKE:** [`00-bootstrap-gke.sh`](../../scripts/setup/all-flash/00-bootstrap-gke.sh) — no checked-in ClusterConfig
 - Scripts: [`scripts/setup/all-flash/`](../../scripts/setup/all-flash/)
 - Kernel settings: [manifests/all-flash-sysctl-daemonset.yaml](../../manifests/all-flash-sysctl-daemonset.yaml)
-- Layouts: [config/disk-layouts.yaml](../../config/disk-layouts.yaml) — `i8ge.3xlarge-all-flash`, `n2-highmem-16-all-flash`
+- Layouts: [scripts/setup/nvme-bootstrap/disk-layouts.yaml](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml) — `i8ge.3xlarge-all-flash`, `n2-highmem-16-all-flash`
 - Storage class: [vendor/storage/local_fs_storage_class.yaml](../../vendor/storage/local_fs_storage_class.yaml)
 - Environment: `ALL_FLASH_*` keys in [workshop.env.example](../../scripts/env/workshop.env.example) (EKS) or [workshop.env.gke.example](../../scripts/env/workshop.env.gke.example) (GKE)
 

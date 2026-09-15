@@ -15,10 +15,11 @@ fi
 
 require_cmd kubectl
 
-SETUP_DIR="$(dirname "$0")"
 VENDOR_STORAGE="$(vendor_storage_dir)"
 MANIFESTS_DIR="${WORKSHOP_ROOT}/manifests"
-DISK_LAYOUTS="${WORKSHOP_ROOT}/config/disk-layouts.yaml"
+NVME_DIR="$(nvme_bootstrap_dir)"
+DISK_LAYOUTS="$(disk_layouts_config)"
+NVME_INIT="$(nvme_init_script)"
 LAYOUT_RENDERED="$(mktemp)"
 
 kubectl apply -f "${VENDOR_STORAGE}/local_storage_class.yaml"
@@ -51,20 +52,20 @@ if kubectl -n kube-system get cm nvme-disk-layouts >/dev/null 2>&1; then
   live_script="$(kubectl -n kube-system get cm nvme-disk-layouts \
     -o jsonpath='{.data.nvme-init\.py}' 2>/dev/null || true)"
   if [[ "${live_layouts}" != "$(cat "${LAYOUT_RENDERED}")" ]] ||
-     [[ "${live_script}" != "$(cat "${SETUP_DIR}/nvme-init.py")" ]]; then
+     [[ "${live_script}" != "$(cat "${NVME_INIT}")" ]]; then
     bootstrap_needs_rollout=1
   fi
 fi
 
 kubectl create configmap nvme-disk-layouts \
   --from-file=disk-layouts.yaml="${LAYOUT_RENDERED}" \
-  --from-file=nvme-init.py="${SETUP_DIR}/nvme-init.py" \
+  --from-file=nvme-init.py="${NVME_INIT}" \
   -n kube-system \
   --dry-run=client -o yaml | kubectl apply -f -
 rm -f "${LAYOUT_RENDERED}"
 
 echo "Applying NVMe bootstrap DaemonSet..."
-kubectl apply -f "${SETUP_DIR}/nvme-bootstrap-daemonset.yaml"
+kubectl apply -f "${NVME_DIR}/nvme-bootstrap-daemonset.yaml"
 
 if [[ "${bootstrap_needs_rollout}" -eq 1 ]] && kubectl -n kube-system get ds nvme-bootstrap >/dev/null 2>&1; then
   echo "Disk layout or nvme-init.py changed — restarting nvme-bootstrap to re-run init..."

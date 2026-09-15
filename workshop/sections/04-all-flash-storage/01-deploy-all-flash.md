@@ -61,7 +61,7 @@ An Aerospike namespace normally keeps its whole primary index in DRAM — 64 byt
 
 Two things make it work on Kubernetes:
 
-1. **Two PV families per pod.** Data slices stay raw `Block` volumes on `local-ssd`. Index volumes are `Filesystem` PVCs on `local-ssd-fs`; [nvme-bootstrap](../../scripts/setup/nvme-bootstrap-daemonset.yaml) only partitions and symlinks those slices under `/mnt/disks-fs`. local-volume-provisioner publishes them with `volumeMode: Filesystem` and `fsType: ext4`, and **kubelet formats them** when the pod binds — the same path AKO already declares on the CR. Every local NVMe disk is partitioned into both roles — see [config/disk-layouts.yaml](../../config/disk-layouts.yaml).
+1. **Two PV families per pod.** Data slices stay raw `Block` volumes on `local-ssd`. Index volumes are `Filesystem` PVCs on `local-ssd-fs`; [nvme-bootstrap](../../scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml) only partitions and symlinks those slices under `/mnt/disks-fs`. local-volume-provisioner publishes them with `volumeMode: Filesystem` and `fsType: ext4`, and **kubelet formats them** when the pod binds — the same path AKO already declares on the CR. Every local NVMe disk is partitioned into both roles — see [scripts/setup/nvme-bootstrap/disk-layouts.yaml](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml).
 2. **Kernel settings on every node.** A root server sets `vm.dirty_bytes`, `vm.dirty_background_bytes`, `vm.dirty_expire_centisecs`, and `vm.dirty_writeback_centisecs` itself; AKO runs the server unprivileged, so [all-flash-sysctl-daemonset.yaml](../../manifests/all-flash-sysctl-daemonset.yaml) sets them (plus `vm.min_free_kbytes=1310720`) before Aerospike starts. Without them the node refuses to start an all-flash namespace.
 
 ### What the CR looks like
@@ -216,7 +216,7 @@ Leave the cluster running for [Lab 4.2](02-scale-all-flash.md). When Section 4 i
 - Path A: [manifests/all-flash-cluster.yaml](../../manifests/all-flash-cluster.yaml) (EKS) · [manifests/all-flash-cluster-gke.yaml](../../manifests/all-flash-cluster-gke.yaml) (GKE)
 - Path B: [helm/base-all-flash-cluster-values.yaml](../../helm/base-all-flash-cluster-values.yaml) (EKS) · [helm/base-all-flash-cluster-gke-values.yaml](../../helm/base-all-flash-cluster-gke-values.yaml) (GKE)
 - Kernel settings: [manifests/all-flash-sysctl-daemonset.yaml](../../manifests/all-flash-sysctl-daemonset.yaml)
-- Disk layouts: [config/disk-layouts.yaml](../../config/disk-layouts.yaml) (`i8ge.3xlarge-all-flash`, `n2-highmem-16-all-flash`)
+- Disk layouts: [scripts/setup/nvme-bootstrap/disk-layouts.yaml](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml) (`i8ge.3xlarge-all-flash`, `n2-highmem-16-all-flash`)
 - Storage classes: [vendor/storage/local_storage_class.yaml](../../vendor/storage/local_storage_class.yaml) · [vendor/storage/local_fs_storage_class.yaml](../../vendor/storage/local_fs_storage_class.yaml)
 - Both CRs and both value files are generated — edit [scripts/labs/render-all-flash-manifests.py](../../scripts/labs/render-all-flash-manifests.py), not the YAML
 

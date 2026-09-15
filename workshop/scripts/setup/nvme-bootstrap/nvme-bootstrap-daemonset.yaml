@@ -1,5 +1,5 @@
 # NVMe bootstrap for all database nodes — replaces manual node-shell loop.
-# Partitions instance-store NVMe per workshop/config/disk-layouts.yaml and
+# Partitions instance-store NVMe per scripts/setup/nvme-bootstrap/disk-layouts.yaml and
 # symlinks slices into /mnt/disks (Block, local-ssd) or /mnt/disks-fs
 # (Filesystem, local-ssd-fs). Index slices are left unformatted: kubelet
 # formats them when the AerospikeCluster PVC uses volumeMode: Filesystem.

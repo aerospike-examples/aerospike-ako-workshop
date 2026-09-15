@@ -66,7 +66,7 @@ Both EKS (eksctl and Karpenter) and GKE node pools use the same **`nvme-bootstra
    ./scripts/setup/06-setup-local-storage.sh
    ```
 
-   The script applies the `local-ssd` StorageClass, the provisioner, and the cleanup RBAC/controller, then renders ConfigMap `nvme-disk-layouts` in `kube-system` from [`config/disk-layouts.yaml`](../../config/disk-layouts.yaml) plus `nvme-init.py` (applying the `NVME_DISK_LAYOUT` override), applies the DaemonSet, and waits up to `NVME_WAIT_TIMEOUT` (default 1800s) for bootstrap pods. If no baseline nodes exist yet it skips the PV check and defers it to step 0.6.
+   The script applies the `local-ssd` StorageClass, the provisioner, and the cleanup RBAC/controller, then renders ConfigMap `nvme-disk-layouts` in `kube-system` from [`scripts/setup/nvme-bootstrap/disk-layouts.yaml`](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml) plus `nvme-init.py` (applying the `NVME_DISK_LAYOUT` override), applies the DaemonSet, and waits up to `NVME_WAIT_TIMEOUT` (default 1800s) for bootstrap pods. If no baseline nodes exist yet it skips the PV check and defers it to step 0.6.
 
 2. Verify provisioner pods:
 
@@ -110,7 +110,7 @@ Both EKS (eksctl and Karpenter) and GKE node pools use the same **`nvme-bootstra
 
 ## Disk layouts
 
-Layouts are defined in [`config/disk-layouts.yaml`](../../config/disk-layouts.yaml). The bootstrap init container reads the instance type from EC2 IMDS or GCP metadata and applies the matching layout.
+Layouts are defined in [`scripts/setup/nvme-bootstrap/disk-layouts.yaml`](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml). The bootstrap init container reads the instance type from EC2 IMDS or GCP metadata and applies the matching layout.
 
 | Instance type | NVMe total | Exposed partitions |
 |---------------|------------|-------------------|
@@ -123,7 +123,7 @@ Layouts are defined in [`config/disk-layouts.yaml`](../../config/disk-layouts.ya
 
 Override layout for testing with `NVME_DISK_LAYOUT=i8g.4xlarge` in `workshop.env`.
 
-When adding a layout with `instance_store: all`, set `instance_store_devices` in [`config/disk-layouts.yaml`](../../config/disk-layouts.yaml) so setup validation can compute expected local-ssd PV counts (`len(partitions) × instance_store_devices`). Example: `i8g.8xlarge` uses `instance_store_devices: 2` for 2 local SSDs × 6 partitions = 12 PVs per node.
+When adding a layout with `instance_store: all`, set `instance_store_devices` in [`scripts/setup/nvme-bootstrap/disk-layouts.yaml`](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml) so setup validation can compute expected local-ssd PV counts (`len(partitions) × instance_store_devices`). Example: `i8g.8xlarge` uses `instance_store_devices: 2` for 2 local SSDs × 6 partitions = 12 PVs per node.
 
 ## Instructor demo — local PVC cleanup on node failure
 
@@ -187,7 +187,7 @@ Optional demo after Part B (uses [`manifests/local-ssd-demo.yaml`](../../manifes
 | nvme-bootstrap not Ready | Check privileged init logs; re-run `06-setup-local-storage.sh` |
 | No partition symlinks | Confirm instance type in `disk-layouts.yaml`; check IMDS (EKS) or GCP metadata (GKE) from the node |
 | Cleanup controller not deleting PVCs | Verify `--storageclass-names=local-ssd` and controller pod logs |
-| Wrong partition count | Set `NVME_DISK_LAYOUT` or update `config/disk-layouts.yaml` |
+| Wrong partition count | Set `NVME_DISK_LAYOUT` or update `scripts/setup/nvme-bootstrap/disk-layouts.yaml` |
 | Wrong PV sizes (stale partition table) | Delete local-ssd PVs and PVCs. On each affected node, remove bootstrap markers: `rm -rf /var/lib/workshop/nvme-bootstrap` (legacy: `/mnt/disks/.nvme-bootstrap`). Replace the node (fresh instance store / local SSD) or manually wipe GPT only when no PVs are bound. Re-run `06-setup-local-storage.sh`. Expect EKS ~512Gi slices (3× i8g.2xlarge, 6× i8g.4xlarge) or GKE ~375Gi full-disk `p1` (3× n2-highmem-8, 6× n2-highmem-16). |
 | nvme-bootstrap re-runs on every lab | Expected only when new workload nodes join the pool. Reused nodes skip bootstrap via markers in `/var/lib/workshop/nvme-bootstrap/`. |
 | Provisioner logs: `.nvme-bootstrap` filesystem mode | Harmless on old nodes until nvme-bootstrap re-runs; re-apply storage setup (`06-setup-local-storage.sh`) or restart nvme-bootstrap pods to migrate markers off `/mnt/disks`. |
@@ -203,8 +203,8 @@ Setup manifests (Path A only — no Helm pairs):
 
 - [manifests/aerospike_local_volume_provisioner.yaml](../../manifests/aerospike_local_volume_provisioner.yaml)
 - [manifests/local-ssd-demo.yaml](../../manifests/local-ssd-demo.yaml) (optional instructor demo)
-- [scripts/setup/nvme-bootstrap-daemonset.yaml](../../scripts/setup/nvme-bootstrap-daemonset.yaml)
-- [config/disk-layouts.yaml](../../config/disk-layouts.yaml)
+- [scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml](../../scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml)
+- [scripts/setup/nvme-bootstrap/disk-layouts.yaml](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml)
 - Vendored EBS / GKE PD / local storage: [vendor/storage/](../../vendor/storage/)
 
 ## References

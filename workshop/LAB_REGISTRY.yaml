@@ -129,7 +129,7 @@ labs:
     deploy_paths: [kubectl, helm]
     node_provisioning: [eksctl, karpenter]
     artifacts:
-      kubectl: [scripts/setup/nvme-bootstrap-daemonset.yaml, config/disk-layouts.yaml]
+      kubectl: [scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml, scripts/setup/nvme-bootstrap/disk-layouts.yaml]
     scripts:
       - scripts/setup/05-setup-ebs-storage.sh
       - scripts/setup/06-setup-local-storage.sh
@@ -197,7 +197,7 @@ labs:
       kubectl:
         - clusters/all-flash-cluster.yaml
         - manifests/all-flash-sysctl-daemonset.yaml
-        - config/disk-layouts.yaml
+        - scripts/setup/nvme-bootstrap/disk-layouts.yaml
         - vendor/storage/local_fs_storage_class.yaml
       helm: []
     scripts:
