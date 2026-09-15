@@ -76,15 +76,15 @@ Update patch tags each workshop season to match [enterprise image tags](https://
 
 | Cluster | Name | Purpose |
 |---------|------|---------|
-| **Main** | `my-cluster` | All labs except 2.6 and Section 4 (eksctl or Karpenter) |
-| **Upgrade lab** (opt-in) | `my-cluster-k8s-upgrade` | Lab 2.6 control plane upgrade only (**eksctl MNG always**) |
+| **Main** | `my-cluster` | All labs except 2.6 and Section 4 (eksctl, Karpenter, or GKE node pools) |
+| **Upgrade lab** (opt-in) | `my-cluster-k8s-upgrade` | Lab 2.6 control plane upgrade only (**eksctl MNG on EKS, GKE node pool on GKE**) |
 | **All-flash** (opt-in) | `my-cluster-all-flash` | Section 4 only — index-on-flash nodes (`i8ge.3xlarge` / `n2-highmem-16`, **eksctl MNG or GKE node pool always**) |
 
 **kubectl default context is `my-cluster`** for all labs except the 2.6 and Section 4 demo steps. Use `./scripts/lib/kubecontext.sh show` to verify.
 
 Steps **0.7** and **0.8** are **opt-in** — `setup-all.sh` never creates those clusters by default. Run `--step 0.7` (or `--with-upgrade-lab`) for Lab 2.6, and `--step 0.8` for Section 4. Tear down upgrade-lab after Lab 2.6 with `--upgrade-lab-only` and all-flash after Lab 4.2 with `--all-flash-only`; end-of-course use `./scripts/cleanup-lab.sh` to delete **all** clusters.
 
-Lab tables use the actual EKS cluster name (`my-cluster`), not the role label "Main".
+Lab tables use the actual cluster name (`my-cluster`), not the role label "Main".
 
 ## Lab registry
 

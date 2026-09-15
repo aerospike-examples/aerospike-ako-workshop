@@ -10,7 +10,7 @@
 | 2.4 | ~20m | Rolling DB upgrade 8.1.0.x → 8.1.2.x (requires AKO 4.5.0); start `run-lab-workload.sh` in Terminal B before image apply |
 | 2.5 (eksctl / GKE node pool) | ~25m | Drain demo: migration-gated webhook block; Phase 3 Path A/B; optional same-AZ nodegroup scale before drain; Phase 4 EC2 terminate or `gcloud compute instances delete` + PVC cleanup; optional blocklist alternate; optional asadm quiesce step |
 | 2.5 (Karpenter) | ~25m (+15m add-on) | Same drain + Phase 3 story; Phase 4: primary NodeClaim delete **or** alternate manual EC2 terminate (same as eksctl); optional Karpenter disruption add-on; no blocklist |
-| 2.6 | ~45–60m | Two-phase EKS upgrade: CP (~10–20m) then nodegroup (~15–25m); Phase 1 seed + Terminal B workload recommended; nodegroup = Lab 2.5 drain mechanics at scale |
+| 2.6 | ~45–60m | Two-phase upgrade (EKS MNG or GKE node pool): CP (~10–20m) then worker pool (~15–25m); Phase 1 seed + Terminal B workload recommended; node pool = Lab 2.5 drain mechanics at scale |
 
 ## AKO upgrade (2.2)
 
@@ -22,12 +22,13 @@
 ## Lab 2.6 (control plane)
 
 - **Separate cluster only** — `./scripts/lib/kubecontext.sh upgrade-lab` or `./scripts/labs/prepare-lab.sh 2.6`
-- **Two-phase story** — Phase 3 (CP): pods stay Running, no kubelet change; Phase 4 (nodegroup): first Aerospike restarts, Lab 2.5 mechanics (drain, migration, local-ssd PVC cleanup)
-- **Bridge from Lab 2.5** — frame nodegroup upgrade as automated rolling drain; safe eviction on upgrade-lab is OLM-default off — patch subscription before Phase 4 (same as Lab 2.5 Path A)
+- **Two-phase story** — Phase 3 (CP): pods stay Running, no kubelet change; Phase 4 (node pool): first Aerospike restarts, Lab 2.5 mechanics (drain, migration, local-ssd PVC cleanup)
+- **Bridge from Lab 2.5** — frame the managed pool upgrade as automated rolling drain; safe eviction on upgrade-lab is OLM-default off — patch subscription before Phase 4 (same as Lab 2.5 Path A)
 - **Phase 1 seed data** — `load-data.sh --upgrade-lab` or `prepare-lab.sh 2.6 --load-data`; empty cluster makes availability demo weak
-- **Terminal B recommended** — `./scripts/labs/run-lab-workload.sh --upgrade-lab start` before Phase 3; watch TPS through CP blips and nodegroup pod moves; stop after Phase 5
+- **Terminal B recommended** — `./scripts/labs/run-lab-workload.sh --upgrade-lab start` before Phase 3; watch TPS through CP blips and node-pool pod moves; stop after Phase 5
 - **Two-terminal observe** — Terminal A: upgrade scripts; Terminal B: pods, CR phase, migrate stats (Phase 4), PVC watch (device storage)
-- **Timing** — CP `upgrade-control-plane.sh` waits `cluster-active` (~10–20m); nodegroup `upgrade-nodegroup.sh` waits `nodegroup-active` (~15–25m for 3 nodes)
+- **Timing** — CP `upgrade-control-plane.sh` (~10–20m; EKS waits `cluster-active`, GKE `gcloud … --master` blocks); node pool `upgrade-nodegroup.sh` (~15–25m for 3 Aerospike workers)
+- **GKE** — versions look like `1.35.x-gke.y` (prefix match); only `${UPGRADE_LAB_NODEGROUP_NAME}` is upgraded, not `default-pool`
 - Do not scale down Aerospike during either phase
 - After Lab 2.6 (keep main cluster): `./scripts/cleanup-lab.sh --upgrade-lab-only --yes` then `./scripts/lib/kubecontext.sh main`
 - End of full training: `./scripts/cleanup-lab.sh --yes` (both clusters)

@@ -165,7 +165,7 @@ labs:
     ako_min_version: null
     deploy_paths: [kubectl, helm]
     node_provisioning: [eksctl]
-    node_provisioning_note: "Upgrade-lab cluster always uses eksctl MNG — independent of main cluster NODE_PROVISIONING"
+    node_provisioning_note: "Upgrade-lab cluster always uses eksctl MNG (GKE: node pool) — independent of main cluster NODE_PROVISIONING"
     cloud_providers: [eks, gke]
     opt_in: true
     opt_in_note: "setup-all.sh does not create this cluster by default; run --step 0.7 or --with-upgrade-lab"
@@ -173,10 +173,12 @@ labs:
       kubectl: [clusters/upgrade-lab-cluster.yaml, manifests/disk-cluster.yaml, manifests/dim-cluster.yaml]
     scripts:
       - scripts/setup/upgrade-lab/00-bootstrap-eks.sh
+      - scripts/setup/upgrade-lab/00-bootstrap-gke.sh
       - scripts/setup/upgrade-lab/setup-upgrade-lab-post-bootstrap.sh
     depends_on: ["0.6"]
     doc_urls:
       - https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html
+      - https://cloud.google.com/kubernetes-engine/docs/how-to/upgrading-a-cluster
     validation_status: draft
     validated_on: null
     validated_with: { ako: null, k8s: null }
@@ -430,7 +432,8 @@ labs:
     ako_min_version: null
     deploy_paths: [kubectl, helm]
     node_provisioning: [eksctl]
-    node_provisioning_note: "Upgrade-lab cluster always uses eksctl MNG — independent of main cluster NODE_PROVISIONING"
+    node_provisioning_note: "Upgrade-lab cluster always uses eksctl MNG (GKE: node pool) — independent of main cluster NODE_PROVISIONING"
+    cloud_providers: [eks, gke]
     opt_in: true
     opt_in_note: "Optional — dedicated upgrade-lab cluster (setup step 0.7)"
     artifacts:
@@ -447,6 +450,7 @@ labs:
     depends_on: ["0.6", "0.7"]
     doc_urls:
       - https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html
+      - https://cloud.google.com/kubernetes-engine/docs/how-to/upgrading-a-cluster
     validation_status: draft
     validated_on: null
     validated_with: { ako: null, k8s: null }
@@ -713,5 +717,5 @@ karpenter_validation:
   validator: null
   notes: >
     Run full main curriculum once on EKS with NODE_PROVISIONING=karpenter.
-    Lab 2.6 remains on separate eksctl upgrade-lab cluster.
+    Lab 2.6 remains on a separate upgrade-lab cluster (eksctl MNG on EKS, GKE node pool on GKE).
     Lab 2.5 blocklist path is eksctl-only.

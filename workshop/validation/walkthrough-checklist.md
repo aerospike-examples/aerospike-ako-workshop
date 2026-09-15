@@ -50,7 +50,7 @@ For **Karpenter path** runs, use [karpenter-walkthrough.md](karpenter-walkthroug
 - [ ] **2.5 (eksctl only)** — blocklist path validated (same migration observation)
 - [ ] **2.5 (Karpenter only)** — drain + Phase 4 NodeClaim replacement; **no blocklist**
 - [ ] **2.5 (Karpenter only) add-on** — do-not-disrupt graduation + `terminationGracePeriod` (instructor-led)
-- [ ] **2.6** K8s control plane upgrade *(optional)* — Phase 1 data + `run-lab-workload.sh --upgrade-lab` in Terminal B; 3 pods Running through CP upgrade; nodegroup rolling replace with CR/migrate observe; `validate-post-upgrade.sh` PASS (upgrade-lab eksctl cluster)
+- [ ] **2.6** K8s control plane upgrade *(optional)* — Phase 1 data + `run-lab-workload.sh --upgrade-lab` in Terminal B; 3 pods Running through CP upgrade; node-pool rolling replace with CR/migrate observe; `validate-post-upgrade.sh` PASS (upgrade-lab: eksctl MNG on EKS, GKE node pool on GKE)
 
 ## Section 3 — Security & Authentication
 
