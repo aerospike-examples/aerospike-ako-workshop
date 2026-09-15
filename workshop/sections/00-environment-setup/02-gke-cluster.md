@@ -19,7 +19,7 @@ GKE Autopilot is **not** supported (the nvme-bootstrap DaemonSet needs privilege
 ## Prerequisites
 
 - Lab 0.1 complete (`CLOUD_PROVIDER=gke`, copy [`workshop.env.gke.example`](../../scripts/env/workshop.env.gke.example) → `workshop.env`)
-- `gcloud` authenticated; APIs `container.googleapis.com` and `compute.googleapis.com` enabled
+- `gcloud` authenticated; `gke-gcloud-auth-plugin` installed; APIs `container.googleapis.com` and `compute.googleapis.com` enabled
 - Quota in `${CLUSTER_ZONES}` for `${NODE_COUNT}`× `${NODE_TYPE}` now and `${NODE_COUNT}`× `${NODE_TYPE_VERTICAL}` in Lab 1.2, plus Local SSD (`${GKE_LOCAL_SSD_COUNT}` × 375 GiB per baseline node)
 
 ## Starting state
@@ -82,6 +82,7 @@ kubectl get nodes -l workshop.aerospike.com/node-pool=baseline
 | `GCP_PROJECT` missing | Copy `workshop.env.gke.example` and set the project id |
 | Ran `02-bootstrap-eks.sh` with a GKE env | Expected — use `./scripts/setup/02-bootstrap-gke.sh` |
 | API not enabled | `gcloud services enable container.googleapis.com compute.googleapis.com --project=$GCP_PROJECT` |
+| `gke-gcloud-auth-plugin not found` / kubectl cannot download OpenAPI | `gcloud components install gke-gcloud-auth-plugin`, then `gcloud container clusters get-credentials ${CLUSTER_NAME} --region ${GCP_REGION}` |
 | Local SSD quota | Request Local SSD + N2 CPUs in `${GCP_REGION}` |
 | Autopilot cluster | Delete and recreate with `02-bootstrap-gke.sh` (Standard only) |
 

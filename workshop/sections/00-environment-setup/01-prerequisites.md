@@ -23,10 +23,10 @@ The instructor client has all required tools, cloud access, and licensing files 
 
 | Category | Checks |
 |----------|--------|
-| Required tools | `kubectl`, `git`, `curl`, `bash`, `krew`; plus **EKS:** `aws`, `eksctl` **or GKE:** `gcloud` |
+| Required tools | `kubectl`, `git`, `curl`, `bash`, `krew`; plus **EKS:** `aws`, `eksctl` **or GKE:** `gcloud`, `gke-gcloud-auth-plugin` |
 | Conditional tools | `helm` — when `DEPLOY_PATH=helm` **or** `NODE_PROVISIONING=karpenter` |
 | Optional tools | `jq` (recommended), `akoctl` (installed in Lab 0.4) |
-| Cloud access | EKS: STS, IAM boundary, EC2 key pair, i8g capacity. GKE: `gcloud auth`, `GCP_PROJECT`, Container API |
+| Cloud access | EKS: STS, IAM boundary, EC2 key pair, i8g capacity. GKE: `gcloud auth`, `gke-gcloud-auth-plugin`, `GCP_PROJECT`, Container API |
 | Workshop files | `secrets/features.conf`; `vendor/storage/local_volume_provisioner_cleanup.yaml` and `local_volume_provisioner_cleanup_rbac.yaml` |
 
 Presence and `--version` are what get verified — the script does not assert minimum tool versions, so check those against [client prerequisites](../../instructor/client-prerequisites.md) yourself.
@@ -62,7 +62,7 @@ Presence and `--version` are what get verified — the script does not assert mi
 
    **EKS** also runs EC2 AZ capacity pre-flight for `${NODE_TYPE}` and `${NODE_TYPE_VERTICAL}` in every `AWS_ZONES` entry, plus **Running On-Demand G and VT** quota (`NODE_COUNT × 2` at Lab 1.2 peak). Re-run capacity only: `./scripts/setup/01b-check-ec2-capacity.sh`.
 
-   **GKE** checks `gcloud` auth, `GCP_PROJECT`, and the Container API. It prints quota hints (N2 CPUs, Local SSD) rather than dry-running instance creates.
+   **GKE** checks `gcloud` auth, `gke-gcloud-auth-plugin` (on `PATH` or in the Cloud SDK `bin` directory), `GCP_PROJECT`, and the Container API. It prints quota hints (N2 CPUs, Local SSD) rather than dry-running instance creates.
 
    **Sample EKS output:**
 
@@ -89,7 +89,7 @@ Presence and `--version` are what get verified — the script does not assert mi
 
 ## Verify (pass/fail)
 
-1. **EKS:** `aws sts get-caller-identity` returns Account, Arn, UserId. **GKE:** `gcloud auth print-access-token` succeeds and `GCP_PROJECT` is set.
+1. **EKS:** `aws sts get-caller-identity` returns Account, Arn, UserId. **GKE:** `gcloud auth print-access-token` succeeds, `gke-gcloud-auth-plugin` is installed, and `GCP_PROJECT` is set.
 2. `kubectl krew version` succeeds (akoctl is optional here; install in Lab 0.4)
 3. `secrets/features.conf` exists
 
@@ -99,6 +99,7 @@ Presence and `--version` are what get verified — the script does not assert mi
 |---------|-----|
 | AWS identity fails | `aws sso login` or `aws configure` |
 | `FAIL GCP_PROJECT` / gcloud auth | Copy `workshop.env.gke.example`, set `GCP_PROJECT`, run `gcloud auth login` |
+| `FAIL gke-gcloud-auth-plugin` | `gcloud components install gke-gcloud-auth-plugin` — required for `kubectl` against GKE. Homebrew `gcloud` may leave the binary under the SDK `bin` dir (not on `PATH`); `gcloud container clusters get-credentials` still works if the file exists there |
 | Container API not enabled | `gcloud services enable container.googleapis.com compute.googleapis.com --project=$GCP_PROJECT` |
 | `FAIL IAM permissions boundary` | Account requires a boundary that was not found — ask your AWS admins for the policy name, or set `IAM_PERMISSIONS_BOUNDARY` to its ARN |
 | `AlreadyExists` on cluster / nodegroup / IAM role | Name already used by someone else in the account — pick a unique `CLUSTER_NAME` |

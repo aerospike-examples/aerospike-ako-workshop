@@ -16,6 +16,7 @@ This document applies to the **machine running the training** (instructor laptop
 |------|:------:|:------:|-------------|--------|
 | AWS CLI | required (EKS) | required (EKS) | 2.x | `aws sts get-caller-identity` |
 | gcloud | required (GKE) | required (GKE) | current | `gcloud auth print-access-token` |
+| gke-gcloud-auth-plugin | required (GKE) | required (GKE) | current | `gke-gcloud-auth-plugin --version` (or SDK `bin/`) |
 | kubectl | required | required | 1.28+ | `kubectl version --client` |
 | eksctl | required (EKS) | required (EKS) | 0.190+ | `eksctl version` |
 | git | required | required | 2.x | `git --version` |
@@ -71,6 +72,7 @@ Use [workshop.env.gke.example](../scripts/env/workshop.env.gke.example) (`CLOUD_
 | Requirement | Verify |
 |-------------|--------|
 | `gcloud` authenticated | `gcloud auth print-access-token` |
+| `gke-gcloud-auth-plugin` | `gcloud components install gke-gcloud-auth-plugin` — `01-validate-client.sh` accepts it on `PATH` or in the Cloud SDK `bin` directory |
 | `GCP_PROJECT` set | `01-validate-client.sh` |
 | APIs enabled | `gcloud services enable container.googleapis.com compute.googleapis.com --project=$GCP_PROJECT` |
 | Quota: N2 CPUs + Local SSD in `${GCP_REGION}` | IAM/quotas console — baseline `n2-highmem-8` ×4 + vertical `n2-highmem-16` ×4 + upgrade-lab ×3 |
@@ -131,6 +133,7 @@ Minimum trainee tools: kubectl + shared kubeconfig, or read-only AWS if trainees
 
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [gcloud](https://cloud.google.com/sdk/docs/install)
+- [gke-gcloud-auth-plugin](https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl#install_plugin)
 - [eksctl](https://eksctl.io/installation/)
 - [krew](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)
 - [AKO scaling — Karpenter + local volumes](https://aerospike.com/docs/kubernetes/manage/configure/scaling)

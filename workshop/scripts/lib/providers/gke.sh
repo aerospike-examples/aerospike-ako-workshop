@@ -326,7 +326,18 @@ provider_validate_client() {
     fi
   }
 
+  _gke_auth_plugin_present() {
+    if command -v gke-gcloud-auth-plugin >/dev/null 2>&1; then
+      return 0
+    fi
+    local sdk_root
+    sdk_root="$(gcloud info --format='value(installation.sdk_root)' 2>/dev/null)" || return 1
+    [[ -x "${sdk_root}/bin/gke-gcloud-auth-plugin" ]]
+  }
+
   _gke_check "gcloud" "gcloud version --format='value(core)'" "Install Google Cloud SDK (gcloud)"
+  _gke_check "gke-gcloud-auth-plugin" "_gke_auth_plugin_present" \
+    "Install: gcloud components install gke-gcloud-auth-plugin (kubectl cannot auth to GKE without it)"
   if [[ -z "${GCP_PROJECT:-}" || "${GCP_PROJECT}" == "your-gcp-project" ]]; then
     echo "FAIL GCP_PROJECT — set it in scripts/env/workshop.env (copy workshop.env.gke.example)"
     _PROVIDER_FAIL=1
