@@ -76,7 +76,7 @@ kubectl -n aerospike get pod aerocluster-1-v1-0 -o jsonpath='{.spec.containers[?
 kubectl get nodes -l workshop.aerospike.com/node-pool=baseline -o custom-columns=NAME:.metadata.name,INSTANCE:.metadata.labels.node\\.kubernetes\\.io/instance-type
 ```
 
-**Pass:** Pods spread across racks/zones; `nodeSelector` shows `baseline`; memory limit `57Gi`; nodes show `i8g.2xlarge` only.
+**Pass:** Pods spread across racks/zones; `nodeSelector` shows `baseline`; memory limit `54Gi`; nodes show `i8g.2xlarge` only.
 
 Optional asadm check:
 
@@ -113,7 +113,7 @@ Change three things together in `rack-cluster-v2-revision.yaml`:
 
 1. **Node pool locator:** `nodeSelector` `baseline` → `vertical`
 2. **Rack revision:** `v1` → `v2` (grows `ns` `250Gi` → `300Gi` and adds `ns2` at `300Gi`)
-3. **Pod resources:** `7` CPU / `57Gi` → `15` CPU / `115Gi`
+3. **Pod resources:** `7` CPU / `54Gi` → `15` CPU / `115Gi`
 
 ### Path A — kubectl
 

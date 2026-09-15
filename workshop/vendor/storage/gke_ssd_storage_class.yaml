@@ -7,6 +7,6 @@ metadata:
 provisioner: pd.csi.storage.gke.io
 parameters:
   type: pd-ssd
-  fsType: ext4
+  csi.storage.k8s.io/fstype: ext4
 allowVolumeExpansion: true
 volumeBindingMode: WaitForFirstConsumer

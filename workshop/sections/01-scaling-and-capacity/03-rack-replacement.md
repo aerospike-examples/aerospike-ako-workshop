@@ -53,7 +53,7 @@ Same as [Lab 1.2 Phase 1](02-rack-awareness-vertical-revision.md#phase-1--deploy
 ./scripts/labs/deploy-rack-cluster-helm.sh  # Path B
 ```
 
-**Expected:** `aerocluster-1-v1-*`, `aerocluster-2-v1-*` on `baseline` / `i8g.2xlarge`; memory `57Gi`; CR `Completed`.
+**Expected:** `aerocluster-1-v1-*`, `aerocluster-2-v1-*` on `baseline` / `i8g.2xlarge`; memory `54Gi`; CR `Completed`.
 
 Verify:
 

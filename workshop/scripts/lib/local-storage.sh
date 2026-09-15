@@ -70,7 +70,7 @@ wait_nvme_bootstrap_ready() {
     return 0
   fi
 
-  echo "Waiting for nvme-bootstrap on i8g nodes (timeout ${timeout}s)..."
+  echo "Waiting for nvme-bootstrap on workload nodes (timeout ${timeout}s)..."
   local deadline=$((SECONDS + timeout))
   while true; do
     ready="$(nvme_bootstrap_ready)"

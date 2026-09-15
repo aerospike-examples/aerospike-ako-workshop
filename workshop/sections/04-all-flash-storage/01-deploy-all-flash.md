@@ -29,11 +29,11 @@ This lab is **independent of Sections 1–3**. Nothing you do here touches `${CL
 
 | | Main cluster (`disk` labs) | All-flash cluster (Section 4) |
 |---|---|---|
-| Primary index | DRAM, sized by `indexes-memory-budget` (57 GiB pods) | Local NVMe, sized by `index-type.mounts-budget` (600 GiB/node) |
+| Primary index | DRAM, sized by `indexes-memory-budget` (54 GiB pods) | Local NVMe, sized by `index-type.mounts-budget` (600 GiB/node) |
 | Namespace storage | `storage-engine.type: device`, 1 block volume | `storage-engine.type: device`, 5 (EKS) or 16 (GKE) block volumes |
 | Extra volumes | none | one Filesystem volume per index mount |
 | Node kernel | defaults | `vm.dirty_*` + `vm.min_free_kbytes` set by a DaemonSet |
-| Pod memory | 57 GiB | 64 GiB — index is on NVMe, not in DRAM |
+| Pod memory | 54 GiB | 64 GiB — index is on NVMe, not in DRAM |
 
 AKO cannot add or remove the index volumes in place, and the `vm.dirty_*` settings apply to the whole kernel, not just Aerospike. Both reasons are why Section 4 gets its own cluster instead of mutating `aerocluster` on `${CLUSTER_NAME}`.
 
@@ -181,7 +181,7 @@ The slices are larger than the claims so that after kubelet formats ext4 there i
 
 ## Observe
 
-- Pod memory requests are **64 GiB** against 96–128 GiB nodes. In the disk labs the pods ask for 57 GiB because the index lives in DRAM; here the index is on NVMe and the remaining RAM is page cache the kernel manages.
+- Pod memory requests are **64 GiB** against 96–128 GiB nodes. In the disk labs the pods ask for 54 GiB because the index lives in DRAM; here the index is on NVMe and the remaining RAM is page cache the kernel manages.
 - `index_flash_used_bytes` grows in 4 KiB pages per sprig, not per record. With `partition-tree-sprigs: 16384` a namespace reserves at least one 4 KiB page per sprig per partition it owns, which is why the 600 GiB budget is generous for a 3-node lab.
 - Each pod's index mounts are node-local. A pod cannot move to another node and keep its index — the same constraint as the block data volumes.
 
