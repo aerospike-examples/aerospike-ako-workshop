@@ -13,7 +13,7 @@ Run a full end-to-end walkthrough of every lab on a real EKS environment before 
 ## Prerequisites for validation
 
 - Main cluster `my-cluster`:
-  - **eksctl path:** baseline per-AZ pools from step 0.2-nodes; vertical pool in Lab 1.2 Phase 2; K8s version from `K8S_VERSION` (default 1.33)
+  - **eksctl path:** baseline per-AZ pools from step 0.2-nodes; vertical pool in Lab 1.2 Phase 2; K8s version from `K8S_VERSION` (default 1.35)
   - **Karpenter path:** system MNG; per-AZ baseline NodePools from step 0.2-nodes; vertical pool `${KARPENTER_NODEPOOL_VERTICAL_NAME}-<zone>` in Lab 1.2 Phase 2 — see [karpenter-walkthrough.md](karpenter-walkthrough.md)
 - Upgrade-lab cluster `my-cluster-k8s-upgrade` (3× i8g.2xlarge; K8s versions from `UPGRADE_LAB_K8S_VERSION_*`) for Lab 2.6 only — **always eksctl MNG**, and only when validating that optional lab (setup step 0.7)
 - All-flash cluster `my-cluster-all-flash` (3→4× `i8ge.3xlarge` on EKS or `n2-highmem-16` + 16 Local SSDs on GKE) for Section 4 only — **always eksctl MNG / GKE node pool**, and only when validating that optional section (setup step 0.8)
@@ -54,7 +54,7 @@ validation_status: validated
 validated_on: "2026-07-14"
 validated_with:
   ako: "4.5.0"
-  k8s: "1.33"   # match K8S_VERSION in workshop.env
+  k8s: "1.35"   # match K8S_VERSION in workshop.env
   node_provisioning: karpenter   # when applicable
 ```
 

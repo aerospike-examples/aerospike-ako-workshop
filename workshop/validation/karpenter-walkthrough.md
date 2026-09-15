@@ -57,7 +57,7 @@ karpenter_validation:
   validated_with:
     karpenter: "1.x.x"
     ako: "4.5.0"
-    k8s: "1.33"   # match K8S_VERSION in workshop.env
+    k8s: "1.35"   # match K8S_VERSION in workshop.env
   validator: "<name>"
 ```
 

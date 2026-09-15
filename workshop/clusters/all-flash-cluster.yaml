@@ -14,7 +14,7 @@ kind: ClusterConfig
 metadata:
   name: my-cluster-all-flash
   region: us-east-1
-  version: "1.33"
+  version: "1.35"
 availabilityZones:
   - us-east-1c
   - us-east-1d

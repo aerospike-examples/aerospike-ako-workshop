@@ -5,7 +5,7 @@
 | Lab ID | `2.6` |
 | Section | Maintenance & Upgrade |
 | EKS cluster | **`my-cluster-k8s-upgrade` only** |
-| K8s upgrade | `1.31 → 1.32` (from `UPGRADE_LAB_K8S_VERSION_*` in workshop.env) |
+| K8s upgrade | `1.34 → 1.35` (from `UPGRADE_LAB_K8S_VERSION_*` in workshop.env) |
 | Aerospike baseline | 3-node device storage on local-ssd **Running before upgrade** (`--dim` for in-memory) |
 | Node provisioning | eksctl MNG only (upgrade-lab cluster) |
 | Duration | ~45–60 min (mostly waiting) |
@@ -16,7 +16,7 @@
 
 A live Aerospike cluster keeps running during an EKS control plane upgrade — but you must still upgrade the node group afterward to align kubelet versions.
 
-**On GKE:** the same scripts call `gcloud container clusters upgrade` (control plane, then node pool). Versions look like `1.32.x-gke.y`; prefix match against `UPGRADE_LAB_K8S_VERSION_TARGET` is enough.
+**On GKE:** the same scripts call `gcloud container clusters upgrade` (control plane, then node pool). Versions look like `1.35.x-gke.y`; prefix match against `UPGRADE_LAB_K8S_VERSION_TARGET` is enough.
 
 EKS upgrade is **two phases**:
 
@@ -71,7 +71,7 @@ kubectl -n aerospike get pods -l aerospike.com/cr=aerocluster
 aws eks describe-cluster --name "${UPGRADE_LAB_CLUSTER_NAME}" --query cluster.version
 ```
 
-**Pass:** Context is `my-cluster-k8s-upgrade`; 3/3 `Running`; EKS version `${UPGRADE_LAB_K8S_VERSION_START}` (default `1.31`).
+**Pass:** Context is `my-cluster-k8s-upgrade`; 3/3 `Running`; EKS version `${UPGRADE_LAB_K8S_VERSION_START}` (default `1.34`).
 
 ## Phase 1 — Seed data + continuous workload
 

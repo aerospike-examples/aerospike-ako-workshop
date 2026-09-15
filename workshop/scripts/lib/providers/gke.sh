@@ -57,7 +57,7 @@ provider_control_plane_status() {
     --format='value(status)' 2>/dev/null || echo unknown
 }
 
-# GKE reports versions like 1.31.6-gke.1064000 — treat prefix match as success.
+# GKE reports versions like 1.35.7-gke.1222000 — treat prefix match as success.
 provider_version_matches() {
   local actual="$1"
   local expected="$2"

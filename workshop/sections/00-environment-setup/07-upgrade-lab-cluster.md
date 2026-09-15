@@ -5,7 +5,7 @@
 | Lab ID | `0.7` |
 | Section | Environment Setup |
 | Cluster | `${UPGRADE_LAB_CLUSTER_NAME}` (default `my-cluster-k8s-upgrade`) |
-| Kubernetes | `${UPGRADE_LAB_K8S_VERSION_START}` (default 1.31 → 1.32 in Lab 2.6) |
+| Kubernetes | `${UPGRADE_LAB_K8S_VERSION_START}` (default 1.34 → 1.35 in Lab 2.6) |
 | Node provisioning | **EKS:** eksctl MNG always (independent of `NODE_PROVISIONING`). **GKE:** node pool always. |
 | Aerospike cluster | `aerocluster`, `${UPGRADE_LAB_AEROSPIKE_SIZE}` nodes (default 3) |
 | Deploy path | OLM **always** — independent of `DEPLOY_PATH` |

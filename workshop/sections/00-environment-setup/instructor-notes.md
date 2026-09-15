@@ -61,7 +61,7 @@
 
 Step **0.7** (Lab 2.6) and step **0.8** (Section 4) are **not** created by a default `setup-all.sh` run. Opt in with `--step 0.7` / `--with-upgrade-lab` and `--step 0.8` (or `prepare-lab.sh 2.6` / `4.1`). See [Lab 0.7](07-upgrade-lab-cluster.md) and [Lab 0.8](08-all-flash-cluster.md).
 
-The upgrade-lab cluster starts on Kubernetes `UPGRADE_LAB_K8S_VERSION_START` (**1.31**, upgraded to 1.32 in Lab 2.6) with pool `ng-upgrade-lab` (`UPGRADE_LAB_NODE_COUNT=3`× `${UPGRADE_LAB_NODE_TYPE}`). Extra cost while it is up is ~3× `i8g.2xlarge` (EKS) or ~3× `n2-highmem-8` (GKE).
+The upgrade-lab cluster starts on Kubernetes `UPGRADE_LAB_K8S_VERSION_START` (**1.34**, upgraded to 1.35 in Lab 2.6) with pool `ng-upgrade-lab` (`UPGRADE_LAB_NODE_COUNT=3`× `${UPGRADE_LAB_NODE_TYPE}`). Extra cost while it is up is ~3× `i8g.2xlarge` (EKS) or ~3× `n2-highmem-8` (GKE).
 
 - **AKO on upgrade-lab is always OLM** — `upgrade-lab/01-install-ako.sh` calls the OLM installer regardless of `DEPLOY_PATH`, and `03-deploy-cluster.sh` deploys `aerocluster` with `kubectl apply`. Path B classes therefore see an OLM operator and a kubectl-applied cluster on this one cluster; call that out rather than letting trainees discover it in Lab 2.6.
 - **`--with-upgrade-lab`:** creates main + upgrade-lab clusters in parallel after 0.1, then completes 0.7 with `upgrade-lab/setup-upgrade-lab-post-bootstrap.sh`. Combine with `--sequential` to bootstrap main first. `--step 0.7` runs the full `upgrade-lab/setup-upgrade-lab.sh` (bootstraps the cluster first if missing).

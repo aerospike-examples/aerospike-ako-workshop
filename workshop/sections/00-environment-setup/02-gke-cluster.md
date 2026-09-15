@@ -5,7 +5,7 @@
 | Lab ID | `0.2` |
 | Section | Environment Setup |
 | Cluster | `${CLUSTER_NAME}` (default `my-cluster`) |
-| Kubernetes | `${K8S_VERSION}` (default 1.33) |
+| Kubernetes | `${K8S_VERSION}` (default 1.35) |
 | Node provisioning | GKE Standard node pools |
 | Duration | ~15–30 min |
 | Validation status | `draft` |
