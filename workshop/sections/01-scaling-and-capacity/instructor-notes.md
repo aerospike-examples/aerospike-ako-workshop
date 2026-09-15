@@ -24,7 +24,7 @@
 | Replacement only | `prepare-lab.sh 1.3` independently (light reset + baseline pool) |
 | Broken / cold start | `reset-cluster.sh --yes` then `prepare-lab.sh <lab>` (or `prepare-lab.sh <lab> --full`) |
 
-Full reset adds ~5–15 min (node provisioning + nvme-bootstrap on first i8g create). Reusing pools between 1.1–1.2 avoids that cost — nvme-bootstrap runs once per new i8g node, not on every `prepare-lab.sh`.
+Full reset adds ~5–15 min (node provisioning + nvme-bootstrap on first `${NODE_TYPE}` create). Reusing pools between 1.1–1.2 avoids that cost — nvme-bootstrap runs once per new workload node, not on every `prepare-lab.sh`.
 
 ## Pitfalls
 
@@ -36,9 +36,9 @@ Full reset adds ~5–15 min (node provisioning + nvme-bootstrap on first i8g cre
 | Karpenter vertical pool multi-AZ mismatch (Lab 1.2 Phase 2) | Re-run `lab-nodes.sh 1.2 ensure --vertical` — same per-AZ NodeClaim rebalance as baseline |
 | Rack pods Pending (node affinity) | `./scripts/reset-cluster.sh --yes && ./scripts/labs/prepare-lab.sh 1.2` |
 | Scale-down stuck | Check CR events; watch migration in `asadm`; wait for AKO to migrate records off removed nodes |
-| Lab 1.2 Phase 2 quota | Expect **8 nodes** (4× baseline idle + 4× vertical); verify EC2 quota |
+| Lab 1.2 Phase 2 quota | Expect **8 nodes** (4× baseline idle + 4× vertical); verify EKS G/VT quota or GKE N2 CPUs + Local SSD |
 | Lab 1.3 standalone | Light reset at start; redeploys v1 then vertical pool — **does not require 1.2 v2** |
-| Missing node-pool labels | Re-run `lab-nodes.sh <lab> ensure`; eksctl path patches labels after scale |
+| Missing node-pool labels | Re-run `lab-nodes.sh <lab> ensure`; eksctl / GKE paths patch labels after scale |
 | Lab 1.4 before AKO 4.4.0 | Follow curriculum: 2.2 first |
 | Lab 1.4 full reset unnecessary | Default is light reset; use `--skip-reset` if dim from 2.2 still Running |
 | Batch scale-down on SC | Call out AP-only constraint |

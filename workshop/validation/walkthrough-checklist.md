@@ -30,8 +30,8 @@ For **Karpenter path** runs, use [karpenter-walkthrough.md](karpenter-walkthroug
 
 - [ ] **1.1** Horizontal scaling — `load-data.sh` (5M records); size 3→5→3; observe rebalance on scale-up and migration wait on scale-down; phase Completed
 - [ ] **1.1 (Karpenter)** — observe `nodeclaims` during scale-up
-- [ ] **1.2** Rack awareness + vertical scale + revision — pods include rack ID; `nodeSelector` baseline→vertical; nodes i8g.4xlarge, memory 115Gi, pods on v2 revision, 2× local-ssd PVCs per pod
-- [ ] **1.3** Rack replacement (standalone) — racks 3+4 only on vertical 4xl; memory 115Gi; no rack 1/2 pods
+- [ ] **1.2** Rack awareness + vertical scale + revision — pods include rack ID; `nodeSelector` baseline→vertical; nodes `${NODE_TYPE_VERTICAL}` (EKS `i8g.4xlarge` / GKE `n2-highmem-16`), memory 115Gi, pods on v2 revision, 2× local-ssd PVCs per pod
+- [ ] **1.3** Rack replacement (standalone) — racks 3+4 only on vertical `${NODE_TYPE_VERTICAL}`; memory 115Gi; no rack 1/2 pods
 
 ## Section 2 — Maintenance & Upgrade
 

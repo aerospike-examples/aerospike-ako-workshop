@@ -4,10 +4,10 @@
 |-------|-------|
 | Lab ID | `1.3` |
 | Section | Scaling & Capacity |
-| EKS cluster | `my-cluster` |
+| Cluster | `my-cluster` |
 | Aerospike cluster | `aerocluster` |
 | AKO min version | `4.2.0` |
-| Aerospike baseline | rack v1 on i8g.2xlarge, then vertical 2× scale via replacement |
+| Aerospike baseline | rack v1 on `${NODE_TYPE}`, then vertical 2× scale via replacement |
 | Deploy path | both |
 | Node provisioning | both |
 | Duration | ~30 min |
@@ -29,8 +29,8 @@ Replacing rack IDs (remove racks 1+2, add racks 3+4) scales vertically to the sa
 
 | Item | Value |
 |------|-------|
-| Phase 1 | `i8g.2xlarge` × 4 — `workshop.aerospike.com/node-pool=baseline` |
-| Phase 2 | `i8g.4xlarge` × 4 — `workshop.aerospike.com/node-pool=vertical` **added alongside baseline** |
+| Phase 1 | `${NODE_TYPE}` × 4 (EKS `i8g.2xlarge` / GKE `n2-highmem-8`) — `workshop.aerospike.com/node-pool=baseline` |
+| Phase 2 | `${NODE_TYPE_VERTICAL}` × 4 (EKS `i8g.4xlarge` / GKE `n2-highmem-16`) — `workshop.aerospike.com/node-pool=vertical` **added alongside baseline** |
 | Phase 3 | Pods on vertical pool only |
 | Reset | **Light** at lab start (database only; provisions baseline pool) |
 
@@ -42,7 +42,7 @@ During Phase 2, both pools may coexist (8 nodes total) — same quota note as La
 ./scripts/labs/prepare-lab.sh 1.3
 ```
 
-**Expected:** Light reset tears down database; 4× `i8g.2xlarge` Ready with `node-pool=baseline`.
+**Expected:** Light reset tears down database; 4× `${NODE_TYPE}` Ready with `node-pool=baseline`.
 
 ## Phase 1 — Deploy v1 baseline (racks 1+2 on baseline pool)
 
@@ -53,7 +53,7 @@ Same as [Lab 1.2 Phase 1](02-rack-awareness-vertical-revision.md#phase-1--deploy
 ./scripts/labs/deploy-rack-cluster-helm.sh  # Path B
 ```
 
-**Expected:** `aerocluster-1-v1-*`, `aerocluster-2-v1-*` on `baseline` / `i8g.2xlarge`; memory `54Gi`; CR `Completed`.
+**Expected:** `aerocluster-1-v1-*`, `aerocluster-2-v1-*` on `baseline` / `${NODE_TYPE}` (EKS `i8g.2xlarge` / GKE `n2-highmem-8`); memory `54Gi`; CR `Completed`.
 
 Verify:
 
@@ -63,7 +63,7 @@ kubectl -n aerospike get pods -o wide
 kubectl -n aerospike get pod aerocluster-1-v1-0 -o jsonpath='{.spec.nodeSelector}{"\n"}'
 ```
 
-**Pass:** `nodeSelector` shows `baseline`; pods on `i8g.2xlarge` only.
+**Pass:** `nodeSelector` shows `baseline`; pods on `${NODE_TYPE}` only.
 
 ## Phase 2 — Add vertical node pool (2× instance size)
 
@@ -73,7 +73,7 @@ kubectl -n aerospike get pod aerocluster-1-v1-0 -o jsonpath='{.spec.nodeSelector
 kubectl get nodes -L workshop.aerospike.com/node-pool,node.kubernetes.io/instance-type
 ```
 
-**Expected:** 4× `i8g.4xlarge` Ready with `node-pool=vertical`; baseline pool remains idle.
+**Expected:** 4× `${NODE_TYPE_VERTICAL}` Ready with `node-pool=vertical`; baseline pool remains idle.
 
 ## Phase 3 — Rack replacement + vertical scale (racks 3+4 replace 1+2)
 
@@ -88,7 +88,7 @@ kubectl -n aerospike get pods -w
 
 **Expected:** Period with racks 1–4 coexisting; rack 1+2 pods terminate after migration; new pods `aerocluster-3-v1-*`, `aerocluster-4-v1-*` on vertical nodes.
 
-Manual equivalent (must call `load_env` so `${NODE_ZONE_A}` / `${NODE_ZONE_B}` are exported from `AWS_ZONES` — sourcing `workshop.env` alone is not enough):
+Manual equivalent (must call `load_env` so `${NODE_ZONE_A}` / `${NODE_ZONE_B}` are exported from `CLUSTER_ZONES` — sourcing `workshop.env` alone is not enough):
 
 ```bash
 source scripts/lib/common.sh
@@ -129,7 +129,7 @@ kubectl -n aerospike get pod aerocluster-3-v1-0 -o jsonpath='{.spec.nodeSelector
 kubectl -n aerospike get pvc -o wide
 ```
 
-**Pass:** No rack 1 or 2 pods; only racks **3+4** on `vertical` / `i8g.4xlarge`; memory `115Gi`; 2 block PVCs per pod; CR `Completed`.
+**Pass:** No rack 1 or 2 pods; only racks **3+4** on `vertical` / `${NODE_TYPE_VERTICAL}` (EKS `i8g.4xlarge` / GKE `n2-highmem-16`); memory `115Gi`; 2 block PVCs per pod; CR `Completed`.
 
 ## Observe
 
@@ -144,8 +144,8 @@ kubectl -n aerospike get pvc -o wide
 |---------|-----|
 | Replacement pods Pending | Verify vertical pool: `lab-nodes.sh 1.3 validate --vertical` |
 | Missing node-pool labels | Re-run `ensure` / `ensure --vertical` |
-| local-ssd PVC exhaustion on 4xl | 2 PVCs per pod; check PV count per node |
-| Webhook: RackConfig Zone cannot be updated / `zone: null` | Rack zones were not rendered — use `./scripts/labs/deploy-rack-cluster-replacement.sh` or run `load_env` before `envsubst` (see Phase 3 manual command). Verify rendered YAML has `zone: us-east-1c` (not blank) |
+| local-ssd PVC exhaustion on vertical | 2 PVCs per pod; check PV count per node |
+| Webhook: RackConfig Zone cannot be updated / `zone: null` | Rack zones were not rendered — use `./scripts/labs/deploy-rack-cluster-replacement.sh` or run `load_env` before `envsubst` (see Phase 3 manual command). Verify rendered YAML has a zone from `CLUSTER_ZONES` (not blank) |
 
 ## Not covered here
 

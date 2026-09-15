@@ -4,7 +4,7 @@
 | ------------------ | ------------------------------------------------------------------------- |
 | Lab ID             | `1.1`                                                                     |
 | Section            | Scaling & Capacity                                                        |
-| EKS cluster        | `my-cluster`                                                              |
+| Cluster            | `my-cluster`                                                              |
 | Aerospike cluster  | `aerocluster`                                                             |
 | AKO min version    | `4.2.0`                                                                   |
 | Aerospike baseline | 3-node device storage on local-ssd (default; `--dim` for in-memory)     |
@@ -27,9 +27,9 @@
 
 | Item | Value |
 |------|-------|
-| Instance | `i8g.2xlarge` × 4 |
+| Instance | `${NODE_TYPE}` × 4 (EKS `i8g.2xlarge` / GKE `n2-highmem-8`) |
 | Reset | **Full** |
-| Nodegroups | 2 × `${NODEGROUP_NAME}-<zone>` (eksctl) or 2 × `${KARPENTER_NODEPOOL_NAME}-<zone>` (Karpenter) |
+| Nodegroups | 2 × `${NODEGROUP_NAME}-<zone>` (eksctl / GKE) or 2 × `${KARPENTER_NODEPOOL_NAME}-<zone>` (Karpenter) |
 | Scale-up | 5 nodes temporarily (3+2 across zones) |
 
 ## Phase 0 — Prepare lab
@@ -38,7 +38,7 @@
 ./scripts/labs/prepare-lab.sh 1.1
 ```
 
-**Expected:** 4 workload nodes `Ready` across `${AWS_ZONES}`; nvme-bootstrap Ready on i8g nodes.
+**Expected:** 4 workload nodes `Ready` across `${CLUSTER_ZONES}` (`${NODE_TYPE}`); nvme-bootstrap Ready on those nodes.
 
 ## Deploy baseline
 
@@ -67,7 +67,7 @@ Verify with `asadm -e "info"` (non-zero objects in namespace `test`).
 
 Horizontal scaling changes cluster capacity by adjusting the number of Aerospike pods. AKO updates the StatefulSet and manages rack distribution when racks are configured.
 
-The cluster uses `multiPodPerHost: false`, so each Aerospike pod requires its own Kubernetes node. Scaling Aerospike 3→5 needs 5 nodes. The workshop environment does not install Cluster Autoscaler — on the eksctl path you scale the node group before applying the scale-up manifest (Karpenter provisions nodes automatically; see **Observe** below).
+The cluster uses `multiPodPerHost: false`, so each Aerospike pod requires its own Kubernetes node. Scaling Aerospike 3→5 needs 5 nodes. The workshop environment does not install Cluster Autoscaler — on the eksctl / GKE node-pool path you scale the node group before applying the scale-up manifest (Karpenter provisions nodes automatically; see **Observe** below).
 
 ## Steps
 

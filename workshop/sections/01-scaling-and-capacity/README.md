@@ -55,7 +55,7 @@ kubectl get nodeclaims -w             # live watch — `-w` accepts one resource
 kubectl get nodes -l workshop.aerospike.com/node-pool=baseline -w
 ```
 
-Labs 1.1, 1.2 (vertical scale), and 1.3 are the best demos for Karpenter provisioning new i8g nodes.
+Labs 1.1, 1.2 (vertical scale), and 1.3 are the best demos for Karpenter provisioning new workload nodes.
 
 ## Instructor notes
 
