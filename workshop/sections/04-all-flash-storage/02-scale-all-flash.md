@@ -57,7 +57,7 @@ The script targets `${ALL_FLASH_CLUSTER_NAME}` (not the main workshop cluster). 
 `multiPodPerHost: false` means one Aerospike pod per node, and every pod claims node-local PVs. Scaling to 4 therefore has three ordered requirements:
 
 1. A 4th node exists in the all-flash pool (`eksctl scale nodegroup` / `gcloud container clusters resize`).
-2. `nvme-bootstrap` has partitioned that node's NVMe — index slices symlinked under `/mnt/disks-fs`, data slices under `/mnt/disks` — and local-volume-provisioner has published both PV families for it.
+2. `nvme-bootstrap` has partitioned that node's NVMe — index slices symlinked under `/mnt/disks/index`, data slices under `/mnt/disks/data` — and local-volume-provisioner has published both PV families for it.
 3. Only then does `spec.size: 4` have somewhere to land.
 
 Skip step 1 or 2 and the new pod sits `Pending` on unbound PVCs. [`scale-all-flash-cluster.sh`](../../scripts/labs/scale-all-flash-cluster.sh) does all three in order; the steps below show them separately so you can watch each one.

@@ -1,0 +1,19 @@
+# Section 4 all-flash only: strategic-merge patch that mounts the index-slice
+# discovery dir into local-volume-provisioner. Applied by
+# scripts/setup/06-setup-local-storage.sh on the all-flash cluster; the patch
+# also rolls the DaemonSet so it re-reads the local-ssd-fs provisioner config.
+spec:
+  template:
+    spec:
+      containers:
+        - name: provisioner
+          volumeMounts:
+            # Index slices — device symlinks published by nvme-bootstrap.
+            - mountPath: /mnt/disks/index
+              name: local-ssd-fs
+              mountPropagation: "HostToContainer"
+      volumes:
+        - name: local-ssd-fs
+          hostPath:
+            path: /mnt/disks/index
+            type: DirectoryOrCreate

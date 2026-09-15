@@ -21,7 +21,7 @@ Three layers handle local NVMe storage — each runs once at its lifecycle stage
 
 | Layer | When it runs | Method |
 |-------|--------------|--------|
-| **nvme-bootstrap** DaemonSet | Once per new workload node — partitions and symlinks into `/mnt/disks` | No blkdiscard in the init; skips already-allocated partitions. EKS: sliced i8g layouts with leftover. GKE: one `p1` covering 0–100% (prime/GPT, no leftover) |
+| **nvme-bootstrap** DaemonSet | Once per new workload node — partitions and symlinks into `/mnt/disks/data` | No blkdiscard in the init; skips already-allocated partitions. EKS: sliced i8g layouts with leftover. GKE: one `p1` covering 0–100% (prime/GPT, no leftover) |
 | **local-volume-provisioner** | When a local-ssd PVC/PV is released | `blockCleanerCommand: blkdiscard.sh` |
 | **AKO init container** | When a pod first attaches a local-ssd block volume | `initMethod: blkdiscardWithHeaderCleanup` (blkdiscard + 8MiB zero header; requires AKO 4.1.0+) |
 

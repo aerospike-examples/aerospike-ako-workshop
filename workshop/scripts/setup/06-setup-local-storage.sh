@@ -9,7 +9,9 @@ ensure_target_kubecontext
 
 # load_env points NODE_TYPE/NVME_DISK_LAYOUT at the all-flash values (index
 # Filesystem slices + data block slices) whenever CLUSTER_NAME is the all-flash cluster.
+IS_ALL_FLASH_CLUSTER=false
 if [[ "${CLUSTER_NAME}" == "${ALL_FLASH_CLUSTER_NAME}" ]]; then
+  IS_ALL_FLASH_CLUSTER=true
   echo "All-flash cluster: layout ${NVME_DISK_LAYOUT} on ${NODE_TYPE}"
 fi
 
@@ -23,9 +25,16 @@ NVME_INIT="$(nvme_init_script)"
 LAYOUT_RENDERED="$(mktemp)"
 
 kubectl apply -f "${VENDOR_STORAGE}/local_storage_class.yaml"
-# local-ssd-fs stays unused unless a layout defines index (fstype) slices.
-kubectl apply -f "${VENDOR_STORAGE}/local_fs_storage_class.yaml"
 kubectl apply -f "${MANIFESTS_DIR}/aerospike_local_volume_provisioner.yaml"
+
+# local-ssd-fs (index slices as Filesystem PVs) exists only on the Section 4
+# all-flash cluster — no other layout defines fstype slices.
+if [[ "${IS_ALL_FLASH_CLUSTER}" == true ]]; then
+  kubectl apply -f "${VENDOR_STORAGE}/local_fs_storage_class.yaml"
+  kubectl apply -f "${MANIFESTS_DIR}/all-flash-local-provisioner-config.yaml"
+  kubectl -n aerospike patch ds local-volume-provisioner \
+    --patch-file "${MANIFESTS_DIR}/all-flash-local-provisioner-patch.yaml"
+fi
 
 for f in local_volume_provisioner_cleanup_rbac.yaml local_volume_provisioner_cleanup.yaml; do
   if [[ ! -f "${VENDOR_STORAGE}/${f}" ]]; then
@@ -72,12 +81,15 @@ if [[ "${bootstrap_needs_rollout}" -eq 1 ]] && kubectl -n kube-system get ds nvm
   kubectl -n kube-system rollout restart ds/nvme-bootstrap
   kubectl -n kube-system rollout status ds/nvme-bootstrap --timeout="${NVME_WAIT_TIMEOUT}s"
   prune_stale_whole_device_pvs "${NVME_DISK_LAYOUT:-${NODE_TYPE}}"
+  prune_stale_discovery_path_pvs
 fi
 
 ready="$(nvme_bootstrap_ready)"
 desired="$(nvme_bootstrap_desired)"
 if [[ "${desired}" -gt 0 ]]; then
   wait_nvme_bootstrap_ready "${desired}"
+  prune_stale_whole_device_pvs "${NVME_DISK_LAYOUT:-${NODE_TYPE}}"
+  prune_stale_discovery_path_pvs
   ensure_baseline_local_ssd_pvs_for_setup
 else
   echo "nvme-bootstrap not scheduled yet — run step 0.2-nodes first; PV check runs in 0.6 validation."

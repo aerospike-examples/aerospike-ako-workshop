@@ -61,7 +61,7 @@ An Aerospike namespace normally keeps its whole primary index in DRAM — 64 byt
 
 Two things make it work on Kubernetes:
 
-1. **Two PV families per pod.** Data slices stay raw `Block` volumes on `local-ssd`. Index volumes are `Filesystem` PVCs on `local-ssd-fs`; [nvme-bootstrap](../../scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml) only partitions and symlinks those slices under `/mnt/disks-fs`. local-volume-provisioner publishes them with `volumeMode: Filesystem` and `fsType: ext4`, and **kubelet formats them** when the pod binds — the same path AKO already declares on the CR. Every local NVMe disk is partitioned into both roles — see [scripts/setup/nvme-bootstrap/disk-layouts.yaml](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml).
+1. **Two PV families per pod.** Data slices stay raw `Block` volumes on `local-ssd`. Index volumes are `Filesystem` PVCs on `local-ssd-fs`; [nvme-bootstrap](../../scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml) only partitions and symlinks those slices under `/mnt/disks/index`. local-volume-provisioner publishes them with `volumeMode: Filesystem` and `fsType: ext4`, and **kubelet formats them** when the pod binds — the same path AKO already declares on the CR. Every local NVMe disk is partitioned into both roles — see [scripts/setup/nvme-bootstrap/disk-layouts.yaml](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml).
 2. **Kernel settings on every node.** A root server sets `vm.dirty_bytes`, `vm.dirty_background_bytes`, `vm.dirty_expire_centisecs`, and `vm.dirty_writeback_centisecs` itself; AKO runs the server unprivileged, so [all-flash-sysctl-daemonset.yaml](../../manifests/all-flash-sysctl-daemonset.yaml) sets them (plus `vm.min_free_kbytes=1310720`) before Aerospike starts. Without them the node refuses to start an all-flash namespace.
 
 ### What the CR looks like
@@ -191,7 +191,7 @@ For AKO logs and general diagnostics, see [Troubleshooting](../../README.md#trou
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| Index PVCs stay `Pending` | No `local-ssd-fs` PVs on the node | `kubectl get pv \| grep local-ssd-fs`; then `kubectl -n kube-system logs ds/nvme-bootstrap -c init-nvme --tail=40` — look for `symlink ... /mnt/disks-fs/` |
+| Index PVCs stay `Pending` | No `local-ssd-fs` PVs on the node | `kubectl get pv \| grep local-ssd-fs`; then `kubectl -n kube-system logs ds/nvme-bootstrap -c init-nvme --tail=40` — look for `symlink ... /mnt/disks/index/` |
 | Index PVC Pending with PVs present | Claim larger than the published slice | Compare `kubectl get pv` capacity with the claim; index PVs should be the raw partition size (EKS ~640Gi) |
 | Pod `CrashLoopBackOff`, log says best practice failed | `vm.dirty_*` not set on that node | Check the node has `workshop.aerospike.com/storage=all-flash`, then `kubectl -n kube-system rollout restart ds/all-flash-sysctl` |
 | Pods Pending, nodes look fine | `multiPodPerHost: false` needs one node per pod | `kubectl get nodes -l workshop.aerospike.com/node-pool=baseline`; grow the pool with `./scripts/setup/all-flash/ensure-nodegroup.sh <count>` |

@@ -6,6 +6,8 @@
 : "${LOCAL_VOLUME_PROVISIONER_SETTLE_SECS:=10}"
 : "${LOCAL_SSD_STORAGE_CLASS:=local-ssd}"
 : "${LOCAL_SSD_FS_STORAGE_CLASS:=local-ssd-fs}"
+: "${LOCAL_SSD_DISCOVERY_DIR:=/mnt/disks/data}"
+: "${LOCAL_SSD_FS_DISCOVERY_DIR:=/mnt/disks/index}"
 
 # PV field selectors only support metadata.name/namespace; filter by
 # spec.storageClassName client-side (local-volume-provisioner does not set a label).
@@ -177,6 +179,38 @@ for pv in json.load(sys.stdin).get('items', []):
   while IFS= read -r pv; do
     [[ -z "${pv}" ]] && continue
     echo "Deleting stale whole-device PV ${pv} (partitioned layout ${layout_key})"
+    kubectl delete pv "${pv}" --ignore-not-found
+  done <<< "${stale}"
+}
+
+# local-volume-provisioner never retracts a PV whose hostDir moved. Unbound PVs
+# still pointing at /mnt/disks/<device> (or /var/lib/workshop/disks-fs) overlap
+# the new /mnt/disks/data and /mnt/disks/index discovery dirs.
+prune_stale_discovery_path_pvs() {
+  local stale pv
+
+  stale="$(kubectl get pv -o json 2>/dev/null | python3 -c "
+import json, sys
+
+prefixes = {
+    '${LOCAL_SSD_STORAGE_CLASS}': '${LOCAL_SSD_DISCOVERY_DIR}',
+    '${LOCAL_SSD_FS_STORAGE_CLASS}': '${LOCAL_SSD_FS_DISCOVERY_DIR}',
+}
+for pv in json.load(sys.stdin).get('items', []):
+    spec = pv.get('spec', {})
+    prefix = prefixes.get(spec.get('storageClassName', ''))
+    if not prefix:
+        continue
+    if pv.get('status', {}).get('phase') != 'Available':
+        continue
+    path = spec.get('local', {}).get('path', '')
+    if path and not path.startswith(prefix + '/') and path != prefix:
+        print(pv['metadata']['name'])
+" || true)"
+
+  while IFS= read -r pv; do
+    [[ -z "${pv}" ]] && continue
+    echo "Deleting stale PV ${pv} (discovery dir moved to ${LOCAL_SSD_DISCOVERY_DIR} / ${LOCAL_SSD_FS_DISCOVERY_DIR})"
     kubectl delete pv "${pv}" --ignore-not-found
   done <<< "${stale}"
 }

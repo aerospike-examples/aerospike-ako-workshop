@@ -1,8 +1,9 @@
 # NVMe bootstrap for all database nodes — replaces manual node-shell loop.
 # Partitions instance-store NVMe per scripts/setup/nvme-bootstrap/disk-layouts.yaml and
-# symlinks slices into /mnt/disks (Block, local-ssd) or /mnt/disks-fs
-# (Filesystem, local-ssd-fs). Index slices are left unformatted: kubelet
-# formats them when the AerospikeCluster PVC uses volumeMode: Filesystem.
+# symlinks slices into /mnt/disks/data (Block, local-ssd) or /mnt/disks/index
+# (Filesystem, local-ssd-fs — Section 4 all-flash layouts only, empty elsewhere).
+# Index slices are left unformatted: kubelet formats them when the
+# AerospikeCluster PVC uses volumeMode: Filesystem.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -63,8 +64,6 @@ spec:
           volumeMounts:
             - name: host-mnt-disks
               mountPath: /host/mnt/disks
-            - name: host-mnt-disks-fs
-              mountPath: /host/mnt/disks-fs
             - name: host-bootstrap-state
               mountPath: /host/var/lib/workshop/nvme-bootstrap
             - name: host-dev
@@ -80,13 +79,11 @@ spec:
               cpu: 1m
               memory: 8Mi
       volumes:
+        # /mnt is read-only on GKE COS; /mnt/disks is tmpfs. nvme-init.py creates
+        # data/ and index/ under that mount — never a sibling of /mnt/disks.
         - name: host-mnt-disks
           hostPath:
             path: /mnt/disks
-            type: DirectoryOrCreate
-        - name: host-mnt-disks-fs
-          hostPath:
-            path: /mnt/disks-fs
             type: DirectoryOrCreate
         - name: host-bootstrap-state
           hostPath:

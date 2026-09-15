@@ -21,9 +21,9 @@ kubectl apply -f "${MANIFESTS_DIR}/all-flash-sysctl-daemonset.yaml"
 kubectl -n kube-system rollout status ds/all-flash-sysctl --timeout=300s
 
 echo "=== All-flash local NVMe layout ==="
-# 06-setup-local-storage.sh applies both the local-ssd (block) and local-ssd-fs
-# (filesystem) classes, and picks the all-flash partition layout because
-# CLUSTER_NAME is the all-flash cluster.
+# Because CLUSTER_NAME is the all-flash cluster, 06-setup-local-storage.sh adds
+# the local-ssd-fs (filesystem) class on top of local-ssd (block) and picks the
+# all-flash partition layout.
 "${SETUP_DIR}/06-setup-local-storage.sh"
 
 echo "=== All-flash PV inventory ==="

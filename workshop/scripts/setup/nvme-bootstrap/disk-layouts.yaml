@@ -5,8 +5,8 @@
 # with nvme-cli (EC2 instance store or GCE local NVMe), not hardcoded names.
 #
 # Publishing (local-volume-provisioner):
-#   default partitions  → symlink under /mnt/disks     → Block PV (local-ssd)
-#   partition.fstype    → symlink under /mnt/disks-fs  → Filesystem PV (local-ssd-fs)
+#   default partitions  → symlink under /mnt/disks/data  → Block PV (local-ssd)
+#   partition.fstype    → symlink under /mnt/disks/index → Filesystem PV (local-ssd-fs)
 #                         kubelet formats (fsType ext4); nvme-bootstrap does not mkfs.
 
 force_layout: ""  # workshop.env NVME_DISK_LAYOUT; empty = detect instance type

@@ -79,10 +79,12 @@ Or invoke the script directly:
 
 `06-setup-local-storage.sh` detects the all-flash cluster by name and switches to `ALL_FLASH_NVME_DISK_LAYOUT` instead of the instance type's main-curriculum layout. That layout marks one partition per disk with `fstype: ext4`, and [`nvme-init.py`](../../scripts/setup/nvme-bootstrap/nvme-init.py) then:
 
-- symlinks that partition into `/mnt/disks-fs/<device>p<n>` (Filesystem discovery dir)
-- symlinks the remaining partitions into `/mnt/disks` as before
+- symlinks that partition into `/mnt/disks/index/<device>p<n>` (Filesystem discovery dir)
+- symlinks the remaining partitions into `/mnt/disks/data` as before
 
-local-volume-provisioner publishes the first group as **Filesystem** PVs on `local-ssd-fs` (`fsType: ext4`) and the second as **Block** PVs on `local-ssd`. Kubelet formats the index devices when the AerospikeCluster PVC uses `volumeMode: Filesystem` — nvme-bootstrap does not mkfs. Both classes exist on every cluster; `local-ssd-fs` simply stays empty where no layout defines index slices.
+local-volume-provisioner publishes the first group as **Filesystem** PVs on `local-ssd-fs` (`fsType: ext4`) and the second as **Block** PVs on `local-ssd`. Kubelet formats the index devices when the AerospikeCluster PVC uses `volumeMode: Filesystem` — nvme-bootstrap does not mkfs. `local-ssd-fs` is set up only here: on the all-flash cluster the setup step also applies [`all-flash-local-provisioner-config.yaml`](../../manifests/all-flash-local-provisioner-config.yaml) and mounts the index discovery dir into the provisioner. The main cluster runs the provisioner with `local-ssd` alone.
+
+Both dirs are children of `/mnt/disks`, which is a writable tmpfs on GKE Container-Optimized OS. A sibling like `/mnt/disks-fs` cannot be created there because `/mnt` itself is read-only.
 
 | Cloud | Per node |
 |-------|----------|
@@ -105,7 +107,7 @@ kubectl -n aerospike get aerospikecluster
 
 | Symptom | Fix |
 |---------|-----|
-| No `local-ssd-fs` PVs | `kubectl -n kube-system logs ds/nvme-bootstrap -c init-nvme --tail=40` — look for `symlink ... /mnt/disks-fs/`; then `kubectl -n aerospike rollout restart ds/local-volume-provisioner` |
+| No `local-ssd-fs` PVs | `kubectl -n kube-system logs ds/nvme-bootstrap -c init-nvme --tail=40` — look for `symlink ... /mnt/disks/index/`; then `kubectl -n aerospike rollout restart ds/local-volume-provisioner` |
 | `nvme-bootstrap` not scheduled | Its node affinity lists instance types; `${ALL_FLASH_NODE_TYPE}` must be in [`nvme-bootstrap-daemonset.yaml`](../../scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml) |
 | Pods crash on start | `kubectl -n kube-system logs ds/all-flash-sysctl -c set-sysctls` — all five `vm.*` values must be set on that node |
 | `i8ge.3xlarge` capacity error | Pick another zone with `NODE_ZONE` / `ALL_FLASH_NODE_ZONE`, or change `ALL_FLASH_NODE_TYPE` (and add a matching layout key) |

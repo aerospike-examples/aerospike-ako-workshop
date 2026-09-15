@@ -22,12 +22,16 @@ except ImportError:
 
 HOST = Path("/host")
 CONFIG = Path("/config/disk-layouts.yaml")
-DISKS_DIR = HOST / "mnt" / "disks"
+# GKE COS: /mnt is read-only; /mnt/disks is a writable tmpfs. Keep both
+# discovery dirs as children of that tmpfs so DirectoryOrCreate never has to
+# mkdir a sibling of /mnt/disks (that is what broke /mnt/disks-fs).
+MNT_DISKS_DIR = HOST / "mnt" / "disks"
+DISKS_DIR = MNT_DISKS_DIR / "data"
 # Layout `fstype` slices are published here as device symlinks. The provisioner
 # StorageClass local-ssd-fs uses volumeMode Filesystem + fsType ext4, so kubelet
 # (via the AerospikeCluster PVC) formats and mounts them — nvme-bootstrap does not.
-FS_DISKS_DIR = HOST / "mnt" / "disks-fs"
-LEGACY_BOOTSTRAP_MARKER_DIR = DISKS_DIR / ".nvme-bootstrap"
+FS_DISKS_DIR = MNT_DISKS_DIR / "index"
+LEGACY_BOOTSTRAP_MARKER_DIR = MNT_DISKS_DIR / ".nvme-bootstrap"
 BOOTSTRAP_MARKER_DIR = HOST / "var" / "lib" / "workshop" / "nvme-bootstrap"
 DEV_DIR = Path("/dev")
 
@@ -262,6 +266,18 @@ def remove_legacy_bootstrap_markers() -> None:
         return
     print(f"removing legacy bootstrap markers from {LEGACY_BOOTSTRAP_MARKER_DIR}")
     shutil.rmtree(LEGACY_BOOTSTRAP_MARKER_DIR)
+
+
+def remove_legacy_flat_discovery_links() -> None:
+    """Drop nvme* symlinks from /mnt/disks itself (pre-data/index layout)."""
+    if not MNT_DISKS_DIR.is_dir():
+        return
+    for path in MNT_DISKS_DIR.iterdir():
+        if path.name in {"data", "index"}:
+            continue
+        if path.name.startswith("nvme") and path.is_symlink():
+            path.unlink()
+            print(f"removed legacy discovery symlink {path}")
 
 
 def write_bootstrap_marker(device: str) -> None:
@@ -593,6 +609,7 @@ def bootstrap_main() -> int:
         return 0
 
     remove_legacy_bootstrap_markers()
+    remove_legacy_flat_discovery_links()
 
     _, layout = load_layout()
     stores = discover_instance_store_devices()
