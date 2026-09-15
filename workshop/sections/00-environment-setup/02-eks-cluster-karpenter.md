@@ -4,7 +4,7 @@
 |-------|-------|
 | Lab ID | `0.2` |
 | Section | Environment Setup |
-| EKS cluster | `my-cluster` |
+| Cluster | `my-cluster` |
 | Node provisioning | **Karpenter** |
 | Duration | ~40 min |
 | Validation status | `draft` |

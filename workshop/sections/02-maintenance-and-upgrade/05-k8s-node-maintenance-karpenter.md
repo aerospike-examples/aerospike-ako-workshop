@@ -6,7 +6,7 @@
 |-------|-------|
 | Lab ID | `2.5` |
 | Section | Maintenance & Upgrade |
-| EKS cluster | `my-cluster` |
+| Cluster | `my-cluster` |
 | Node provisioning | **Karpenter** |
 | AKO min version | `4.5.0` |
 | Aerospike baseline | 3-node device storage on local-ssd (**8.1.2.x**); in-memory with `--dim` |

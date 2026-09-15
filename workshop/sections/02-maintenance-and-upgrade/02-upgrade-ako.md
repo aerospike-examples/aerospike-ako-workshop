@@ -4,7 +4,7 @@
 | ------------------ | --------------------------------------------------------------------------------------------- |
 | Lab ID             | `2.2`                                                                                         |
 | Section            | Maintenance & Upgrade                                                                         |
-| EKS cluster        | `my-cluster`                                                                                  |
+| Cluster            | `my-cluster`                                                                                  |
 | AKO ladder         | `4.2.0 → 4.3.0 → 4.4.1 → 4.5.0`                                                               |
 | Aerospike baseline | 3-node cluster Running during upgrade (**8.1.0.x**)                                           |
 | Deploy path        | both                                                                                          |

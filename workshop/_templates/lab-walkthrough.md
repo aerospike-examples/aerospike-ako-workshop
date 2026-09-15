@@ -4,7 +4,7 @@
 |-------|-------|
 | Lab ID | `X.Y` |
 | Section | Section Name |
-| EKS cluster | `my-cluster` |
+| Cluster | `my-cluster` |
 | Aerospike cluster | `aerocluster` |
 | AKO min version | `4.2.0` |
 | Aerospike baseline | dim 3-node / rack block / none |

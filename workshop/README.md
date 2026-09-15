@@ -280,7 +280,7 @@ kubectl akoctl collectinfo -n aerospike,operators --path /tmp/akoctl-lab
 ## Security
 
 - **`secrets/features.conf`** — Aerospike Enterprise license supplied by each instructor; **never committed** (gitignored)
-- **Lab auth passwords** (`admin123`, `app123`, `exporter123`) — generic throwaway defaults for disposable EKS clusters; committed in `scripts/setup/07-deploy-secrets.sh` and documented in [secrets/README.md](secrets/README.md)
+- **Lab auth passwords** (`admin123`, `app123`, `exporter123`) — generic throwaway defaults for disposable lab clusters; committed in `scripts/setup/07-deploy-secrets.sh` and documented in [secrets/README.md](secrets/README.md)
 - **`.kube/`** — local kubeconfig files created during parallel cluster bootstrap (gitignored)
 
 ## Reset / teardown
@@ -289,8 +289,8 @@ kubectl akoctl collectinfo -n aerospike,operators --path /tmp/akoctl-lab
 |------|--------|
 | Remove Aerospike cluster only (keep nodegroups) | `./scripts/labs/teardown-cluster.sh` |
 | Section 3 cleanup (cluster + TLS/PKI secrets + local `secrets/tls/`) | `./scripts/labs/teardown-section-3.sh` — see [Section 03 teardown](sections/03-security-and-authentication/README.md#teardown) |
-| Remove database + all workload nodegroups/NodePools (keep EKS + AKO + storage) | `./scripts/reset-cluster.sh` |
-| Delete entire EKS cluster(s) | `./scripts/cleanup-lab.sh` (default: **both** clusters deleted **in parallel**; Karpenter path drains bootstrap + workload pools first, ~15 min) |
+| Remove database + all workload nodegroups/NodePools (keep the cluster + AKO + storage) | `./scripts/reset-cluster.sh` |
+| Delete entire Kubernetes cluster(s) | `./scripts/cleanup-lab.sh` (default: **both** clusters deleted **in parallel**; Karpenter path drains bootstrap + workload pools first, ~15 min) |
 | Delete upgrade-lab only (after Lab 2.6) | `./scripts/cleanup-lab.sh --upgrade-lab-only` |
 | Delete all-flash cluster only (after Lab 4.2) | `./scripts/cleanup-lab.sh --all-flash-only` |
 | Delete main cluster only | `./scripts/cleanup-lab.sh --main-only` |

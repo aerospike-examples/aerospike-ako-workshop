@@ -4,7 +4,7 @@
 | ------------------ | ----- |
 | Lab ID             | `3.2` |
 | Section            | Security & Authentication |
-| EKS cluster        | `my-cluster` |
+| Cluster            | `my-cluster` |
 | Aerospike cluster  | `aerocluster` |
 | AKO min version    | `4.2.0` |
 | Aerospike baseline | 3-node **8.1.0.0** with service TLS (standard auth, port **4333**) |
