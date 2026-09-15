@@ -27,19 +27,19 @@ Three layers handle local NVMe storage — each runs once at its lifecycle stage
 
 `ssd` workdir volumes (`storageClass: ssd`) use AKO defaults for filesystem PVCs and are unaffected by this split.
 
-**On GKE:** `05-setup-ebs-storage.sh` only applies StorageClass `ssd` (`pd.csi.storage.gke.io` / `pd-ssd`). Local NVMe still uses nvme-bootstrap: one GPT partition (`p1`, 0–100%) per disk — no leftover overprovisioning. Rack lab PVC sizes are the same as EKS (`250Gi` / `300Gi`); no GKE rewrite.
+**On GKE:** `05-setup-ssd-storage.sh` only applies StorageClass `ssd` (`pd.csi.storage.gke.io` / `pd-ssd`). Local NVMe still uses nvme-bootstrap: one GPT partition (`p1`, 0–100%) per disk — no leftover overprovisioning. Rack lab PVC sizes are the same as EKS (`250Gi` / `300Gi`); no GKE rewrite.
 
 ## Prerequisites
 
 - Lab 0.4 complete
 - Vendored cleanup manifests under [`vendor/storage/`](../../vendor/storage/) (`local_volume_provisioner_cleanup*.yaml`) — checked by `01-validate-client.sh`
 
-## Steps — Block storage `ssd` (Part A)
+## Steps — Network-attached `ssd` (Part A)
 
 1. Set up the `ssd` StorageClass (and EBS CSI on EKS):
 
    ```bash
-   ./scripts/setup/05-setup-ebs-storage.sh
+   ./scripts/setup/05-setup-ssd-storage.sh
    ```
 
    **EKS:** applies [`vendor/storage/eks_ssd_storage_class.yaml`](../../vendor/storage/eks_ssd_storage_class.yaml), associates the cluster OIDC provider, creates the IRSA role `AmazonEKS_EBS_CSI_DriverRole-${CLUSTER_NAME}` for `ebs-csi-controller-sa`, and installs the `aws-ebs-csi-driver` addon.
@@ -160,7 +160,7 @@ Optional demo after Part B (uses [`manifests/local-ssd-demo.yaml`](../../manifes
 
    **Expected:** PVCs with node affinity to the deleted node are removed. Pods enter `Pending` waiting for replacement storage.
 
-5. Discuss: `ssd` PVCs survive node loss (EBS or PD); local `local-ssd` PVCs do not — plan capacity and replication accordingly.
+5. Discuss: `ssd` PVCs survive node loss (network-attached disk); local `local-ssd` PVCs do not — plan capacity and replication accordingly.
 
 6. Tear down the demo cluster before Lab 0.6 or Section 1 — this demo uses AerospikeCluster CR name `local-ssd-demo`, not the `aerocluster` name used in later labs:
 
@@ -182,7 +182,7 @@ Optional demo after Part B (uses [`manifests/local-ssd-demo.yaml`](../../manifes
 
 | Symptom | Fix |
 |---------|-----|
-| EBS / PD PVC Pending | **EKS:** verify EBS CSI IAM role and addon. **GKE:** `kubectl get sc ssd` must show `pd.csi.storage.gke.io` |
+| `ssd` PVC Pending | **EKS:** verify EBS CSI IAM role and addon. **GKE:** `kubectl get sc ssd` must show `pd.csi.storage.gke.io` |
 | No local-ssd PVs after setup | Re-run `./scripts/setup/06-setup-local-storage.sh` or `./scripts/setup/08-validate-environment.sh` (both restart the provisioner only if PV count is short) |
 | nvme-bootstrap not Ready | Check privileged init logs; re-run `06-setup-local-storage.sh` |
 | No partition symlinks | Confirm instance type in `disk-layouts.yaml`; check IMDS (EKS) or GCP metadata (GKE) from the node |
@@ -205,7 +205,7 @@ Setup manifests (Path A only — no Helm pairs):
 - [manifests/local-ssd-demo.yaml](../../manifests/local-ssd-demo.yaml) (optional instructor demo)
 - [scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml](../../scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml)
 - [scripts/setup/nvme-bootstrap/disk-layouts.yaml](../../scripts/setup/nvme-bootstrap/disk-layouts.yaml)
-- Vendored EBS / GKE PD / local storage: [vendor/storage/](../../vendor/storage/)
+- Vendored `ssd` (EKS EBS / GKE PD) and local storage: [vendor/storage/](../../vendor/storage/)
 
 ## References
 

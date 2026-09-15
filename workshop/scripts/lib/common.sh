@@ -269,7 +269,7 @@ EOF
 
 # Render a ClusterConfig for `eksctl create cluster -f` (control plane only, no nodegroups).
 # withOIDC stays false to match the CLI default this replaces — the OIDC provider is
-# associated later in step 0.5 (05-setup-ebs-storage.sh).
+# associated later in step 0.5 (05-setup-ssd-storage.sh).
 render_cluster_config() {
   local cluster="$1" region="$2" k8s_version="$3" zones="$4"
   local zone

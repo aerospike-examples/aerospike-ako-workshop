@@ -80,7 +80,7 @@ provider_upgrade_nodes() {
     --region "${AWS_REGION}"
 }
 
-provider_setup_block_storage() {
+provider_setup_ssd_storage() {
   local cluster_name="${1:-${CLUSTER_NAME}}"
   require_cmd aws
   require_cmd eksctl

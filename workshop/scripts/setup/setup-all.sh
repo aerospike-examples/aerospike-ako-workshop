@@ -20,14 +20,14 @@ INCLUDE_UPGRADE_LAB=false
 SKIP_UPGRADE_LAB_EXPLICIT=false
 SEQUENTIAL=false
 
-STEP_NAMES=(0.1 0.2 0.2-nodes 0.3 0.4 0.5-ebs 0.5-local 0.6-secrets 0.6-validate 0.7-upgrade-lab 0.8-all-flash)
+STEP_NAMES=(0.1 0.2 0.2-nodes 0.3 0.4 0.5-ssd 0.5-local 0.6-secrets 0.6-validate 0.7-upgrade-lab 0.8-all-flash)
 STEP_SCRIPTS=(
   01-validate-client.sh
   02-bootstrap-eks.sh
   02-ensure-workload-nodepool.sh
   03-install-ako.sh
   04-install-akoctl.sh
-  05-setup-ebs-storage.sh
+  05-setup-ssd-storage.sh
   06-setup-local-storage.sh
   07-deploy-secrets.sh
   08-validate-environment.sh
@@ -67,7 +67,7 @@ EOF
   cat <<EOF
 
 Composite steps (run all sub-steps for a lab):
-  0.5  →  0.5-ebs + 0.5-local
+  0.5  →  0.5-ssd + 0.5-local
   0.6  →  0.6-secrets + 0.6-validate
 
 Options:
@@ -84,7 +84,7 @@ Examples:
   $(basename "$0") --sequential
   $(basename "$0") --step 0.7              # opt-in Lab 2.6 cluster
   $(basename "$0") --step 0.8              # opt-in Section 4 all-flash cluster
-  $(basename "$0") --from 0.5-ebs
+  $(basename "$0") --from 0.5-ssd
 EOF
 }
 

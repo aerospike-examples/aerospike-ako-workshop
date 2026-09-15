@@ -56,9 +56,9 @@ fi
 echo "Deploying secrets on all-flash cluster (same source as main cluster)..."
 "${ALL_FLASH_DIR}/02-setup-storage-secrets.sh"
 
-# Block storage class `ssd` for the Aerospike work directory (EBS on EKS, PD on GKE).
-echo "Setting up block storage class on all-flash cluster..."
-provider_setup_block_storage "${ALL_FLASH_CLUSTER_NAME}"
+# StorageClass `ssd` for the Aerospike work directory (network-attached disk).
+echo "Setting up ssd StorageClass on all-flash cluster..."
+provider_setup_ssd_storage "${ALL_FLASH_CLUSTER_NAME}"
 
 "${ALL_FLASH_DIR}/03-setup-local-storage.sh"
 

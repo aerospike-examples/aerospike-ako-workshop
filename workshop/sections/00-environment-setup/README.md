@@ -102,7 +102,7 @@ Or invoke scripts directly:
 ./scripts/setup/02-ensure-workload-nodepool.sh
 ./scripts/setup/03-install-ako.sh
 ./scripts/setup/04-install-akoctl.sh
-./scripts/setup/05-setup-ebs-storage.sh
+./scripts/setup/05-setup-ssd-storage.sh
 ./scripts/setup/06-setup-local-storage.sh
 ./scripts/setup/07-deploy-secrets.sh
 ./scripts/setup/08-validate-environment.sh
@@ -117,8 +117,8 @@ See `./scripts/setup/setup-all.sh --list` for the full step → script mapping.
 
 | Step ID | Script |
 |---------|--------|
-| `0.5` | composite: `0.5-ebs` + `0.5-local` |
-| `0.5-ebs` | [`05-setup-ebs-storage.sh`](../../scripts/setup/05-setup-ebs-storage.sh) — EKS: EBS CSI + `ssd`; GKE: PD CSI StorageClass `ssd` |
+| `0.5` | composite: `0.5-ssd` + `0.5-local` |
+| `0.5-ssd` | [`05-setup-ssd-storage.sh`](../../scripts/setup/05-setup-ssd-storage.sh) — StorageClass `ssd` (EKS: EBS CSI; GKE: PD CSI) |
 | `0.5-local` | [`06-setup-local-storage.sh`](../../scripts/setup/06-setup-local-storage.sh) |
 | `0.6` | composite: `0.6-secrets` + `0.6-validate` |
 | `0.6-secrets` | [`07-deploy-secrets.sh`](../../scripts/setup/07-deploy-secrets.sh) |
@@ -127,7 +127,7 @@ See `./scripts/setup/setup-all.sh --list` for the full step → script mapping.
 | `0.8` / `0.8-all-flash` | [`all-flash/setup-all-flash.sh`](../../scripts/setup/all-flash/setup-all-flash.sh) — opt-in, `--step`/`--from` only |
 
 ```bash
-./scripts/setup/setup-all.sh --step 0.5-ebs     # StorageClass ssd only, skip local NVMe
+./scripts/setup/setup-all.sh --step 0.5-ssd     # StorageClass ssd only, skip local NVMe
 ./scripts/setup/setup-all.sh --from 0.5-local   # resume through 0.6
 ```
 

@@ -21,7 +21,7 @@ Racks map to failure domains (zones); AKO schedules pods per rack with rack ID i
 ## Prerequisites
 
 - Lab 1.1 complete, or run full prepare from scratch
-- Section 0 storage layer complete (hybrid EBS workdir + `local-ssd` block devices)
+- Section 0 storage layer complete (hybrid `ssd` workdir + `local-ssd` block devices)
 
 ## Node requirements
 

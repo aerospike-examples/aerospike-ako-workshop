@@ -46,7 +46,7 @@ Also pick **one node provisioning path** for the main cluster (`my-cluster`) and
 
 - Audience runs Karpenter or cluster autoscaler patterns in production
 - Teaching dynamic node provisioning during scale-up labs
-- Full main curriculum including rack labs (EBS `ssd` workdir + `local-ssd` block namespace data on i8g nodes)
+- Full main curriculum including rack labs (`ssd` workdir + `local-ssd` block namespace data on i8g nodes)
 
 **Rack labs (1.2, 1.3):** both end on the vertical `i8g.4xlarge` pool (`workshop.aerospike.com/node-pool=vertical`). Lab 1.2 uses rack **revision** (same rack IDs); Lab 1.3 uses rack **replacement** (racks 3+4 replace 1+2) — standalone, does not require 1.2 v2.
 

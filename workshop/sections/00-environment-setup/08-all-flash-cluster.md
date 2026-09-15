@@ -62,7 +62,7 @@ Or invoke the script directly:
    | AKO | [`01-install-ako.sh`](../../scripts/setup/all-flash/01-install-ako.sh) → OLM or Helm at `${ALL_FLASH_AKO_VERSION}` (default 4.5.0), following `DEPLOY_PATH` |
    | akoctl | Reuses [`04-install-akoctl.sh`](../../scripts/setup/04-install-akoctl.sh) |
    | Secrets | [`02-setup-storage-secrets.sh`](../../scripts/setup/all-flash/02-setup-storage-secrets.sh) → same [`07-deploy-secrets.sh`](../../scripts/setup/07-deploy-secrets.sh) as the main cluster |
-   | Block storage | `ssd` StorageClass (EBS CSI / GCE PD CSI) for the Aerospike work directory |
+   | Network disk | `ssd` StorageClass (EBS on EKS, Persistent Disk on GKE) for the Aerospike work directory |
    | Kernel + NVMe | [`03-setup-local-storage.sh`](../../scripts/setup/all-flash/03-setup-local-storage.sh) → [`all-flash-sysctl`](../../manifests/all-flash-sysctl-daemonset.yaml) DaemonSet, then [`06-setup-local-storage.sh`](../../scripts/setup/06-setup-local-storage.sh) with the all-flash layout |
 
    **Expected:** ends with `=== All-flash cluster ready for Lab 4.1 (no AerospikeCluster yet) ===` followed by `Restored kubectl context to main cluster: ${CLUSTER_NAME}`. Aerospike itself is [Lab 4.1](../04-all-flash-storage/01-deploy-all-flash.md).

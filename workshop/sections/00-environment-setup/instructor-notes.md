@@ -41,7 +41,7 @@
 | Wrong bootstrap script | `02-bootstrap-eks.sh` with a GKE env (or the reverse) fails on purpose — use the matching `02-bootstrap-*.sh` |
 | GKE Autopilot / Karpenter on GCP | Not supported — Standard regional cluster + node pools only |
 | GKE `GCP_PROJECT` / APIs | Copy `workshop.env.gke.example`; enable Container + Compute APIs |
-| EBS CSI IAM fails | Run 05-setup-ebs-storage.sh steps manually; verify OIDC (EKS). GKE only needs StorageClass `ssd` |
+| EBS CSI IAM fails | Run 05-setup-ssd-storage.sh steps manually; verify OIDC (EKS). GKE only needs StorageClass `ssd` |
 | Local disk init skipped | Re-run `06-setup-local-storage.sh`; check nvme-bootstrap init logs |
 | Karpenter nodes missing NVMe | Verify nvme-bootstrap DaemonSet after 0.5 |
 | CSV stuck Pending | `olm/01-install-ako.sh` already approves the pinned InstallPlan (up to 300s); patch `spec.approved` manually only if that timed out |
@@ -50,7 +50,7 @@
 ## Skip paths
 
 - Pre-stage entire Section 0; start training at Section 1 Lab 1.1
-- Skip local storage (0.5 Part B) if only running Lab 1.1 dim — **required for rack labs (1.2–1.3)**. There is no skip flag: run `setup-all.sh --step 0.5-ebs` and omit `0.5-local`, then continue with `--from 0.6-secrets`. A full `setup-all.sh` run always includes 0.5-local.
+- Skip local storage (0.5 Part B) if only running Lab 1.1 dim — **required for rack labs (1.2–1.3)**. There is no skip flag: run `setup-all.sh --step 0.5-ssd` and omit `0.5-local`, then continue with `--from 0.6-secrets`. A full `setup-all.sh` run always includes 0.5-local.
 
 ## Discussion prompts
 

@@ -265,7 +265,7 @@ kubectl akoctl collectinfo -n aerospike,operators --path /tmp/akoctl-lab
 
 | Issue | Check / fix |
 |-------|-------------|
-| EBS PVC Pending | EBS CSI IAM role and addon |
+| `ssd` PVC Pending | **EKS:** EBS CSI IAM role and addon. **GKE:** `kubectl get sc ssd` |
 | Local disk not found | nvme-bootstrap DaemonSet init logs; partition symlinks in `/mnt/disks/data/` ([Lab 0.5](sections/00-environment-setup/05-storage-layer.md)) |
 | CSV not Succeeded | OLM InstallPlan approval ([Lab 0.3 OLM](sections/00-environment-setup/03-install-ako-olm.md)) |
 | Helm webhook errors | cert-manager installed (Path B) |

@@ -9,7 +9,7 @@ AKO scales Aerospike clusters horizontally, vertically, across racks, and adjust
 | Lab | Profile | Notes |
 |-----|---------|-------|
 | 1.1 | Device storage cluster (default; `--dim` for in-memory) | Horizontal scale only |
-| 1.2–1.3 | Hybrid block storage (EBS workdir + `local-ssd`) | Rack labs always use device block storage — `--dim` does not apply |
+| 1.2–1.3 | Hybrid storage (`ssd` workdir + `local-ssd`) | Rack labs always use device block storage — `--dim` does not apply |
 | 1.4 | Replication factor (deferred) | **Run after [Lab 2.2](../02-maintenance-and-upgrade/02-upgrade-ako.md)** |
 
 ## Reset-and-redeploy flow

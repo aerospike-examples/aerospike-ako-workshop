@@ -89,7 +89,7 @@ provider_upgrade_nodes() {
     --quiet
 }
 
-provider_setup_block_storage() {
+provider_setup_ssd_storage() {
   require_cmd kubectl
   local storage_yaml
   storage_yaml="$(vendor_storage_dir)/gke_ssd_storage_class.yaml"

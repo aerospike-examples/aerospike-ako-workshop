@@ -131,7 +131,7 @@ labs:
     artifacts:
       kubectl: [scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml, scripts/setup/nvme-bootstrap/disk-layouts.yaml]
     scripts:
-      - scripts/setup/05-setup-ebs-storage.sh
+      - scripts/setup/05-setup-ssd-storage.sh
       - scripts/setup/06-setup-local-storage.sh
     depends_on: ["0.4"]
     doc_urls:
