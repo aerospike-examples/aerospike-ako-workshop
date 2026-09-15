@@ -178,6 +178,7 @@ If time-limited: demo **4.2.0 → 4.3.0** live; pre-stage **4.4.1** and **4.5.0*
 | `verify-ako-version.sh 4.4.1` fails with `currentCSV=4.4.1` but CSV missing | UpgradePending — InstallPlan not approved | Run `./scripts/labs/upgrade-ako/upgrade-step-olm.sh 4.4.1` to approve the pending plan |
 | Multi-hop InstallPlan (lists 4.3.0, 4.4.1, …) | OLM stable channel resolves to latest | Delete the plan; re-run `upgrade-step-olm.sh` (script keeps `installPlanApproval: Manual` and deletes only true multi-hop plans) |
 | `upgrade-step-olm.sh` loops deleting InstallPlans (`CSVs: unknown`) | macOS kubectl jsonpath bug + script deleted valid single-hop plans | Fixed in script — pull latest and re-run the upgrade step |
+| `installedCSV is 4.3.0 but CSV phase=Installing` right after the step reported the CSV ready | OLM keeps reconciling a new CSV (webhook certs, replaced-CSV cleanup), so the phase flaps back to `Installing` after its first `Succeeded` | Fixed in script — `verify-ako-version.sh` now polls for up to 300s (raise with `AKO_VERIFY_TIMEOUT`) instead of sampling the phase once |
 
 ## Not covered here
 
