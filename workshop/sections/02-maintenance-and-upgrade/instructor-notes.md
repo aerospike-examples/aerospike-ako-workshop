@@ -8,7 +8,7 @@
 | 2.2 | ~30–40m | Three steps: 4.3.0 → 4.4.1 → 4.5.0; demo one step live |
 | 2.3 | ~10m | WarmRestart then PodRestart (cold) on 8.1.0.x cluster (match deploy-cluster.sh); optional Terminal B `run-lab-workload.sh` |
 | 2.4 | ~20m | Rolling DB upgrade 8.1.0.x → 8.1.2.x (requires AKO 4.5.0); start `run-lab-workload.sh` in Terminal B before image apply |
-| 2.5 (eksctl) | ~25m | Drain demo: migration-gated webhook block; Phase 3 Path A/B; optional same-AZ nodegroup scale before drain; Phase 4 EC2 terminate + PVC cleanup; optional blocklist alternate; optional asadm quiesce step |
+| 2.5 (eksctl / GKE node pool) | ~25m | Drain demo: migration-gated webhook block; Phase 3 Path A/B; optional same-AZ nodegroup scale before drain; Phase 4 EC2 terminate or `gcloud compute instances delete` + PVC cleanup; optional blocklist alternate; optional asadm quiesce step |
 | 2.5 (Karpenter) | ~25m (+15m add-on) | Same drain + Phase 3 story; Phase 4: primary NodeClaim delete **or** alternate manual EC2 terminate (same as eksctl); optional Karpenter disruption add-on; no blocklist |
 | 2.6 | ~45–60m | Two-phase EKS upgrade: CP (~10–20m) then nodegroup (~15–25m); Phase 1 seed + Terminal B workload recommended; nodegroup = Lab 2.5 drain mechanics at scale |
 
@@ -44,10 +44,11 @@ Pick **one** guide by `NODE_PROVISIONING` — [eksctl](05-k8s-node-maintenance.m
 - **Phase 4 required (device storage)** — terminate/replace node, watch PVC cleanup controller, confirm pod reschedules
 - **`CLUSTER_STORAGE_DIM_LABS=2.5`** — disk default everywhere except Lab 2.5 stays in-memory for faster drain demos
 
-### Lab 2.5 — eksctl path
+### Lab 2.5 — eksctl / GKE node pool path
 
-- **Phase 2 optional (eksctl)** — `./scripts/labs/lab-nodes.sh 2.5 ensure --replace-zone --node=$NODE` after 2a, before first drain; pre-provisions same-AZ capacity for pod reschedule during drain or after Phase 4 terminate
-- **Alternate demo** — optional `k8sNodeBlockList` section (eksctl guide only)
+- **Phase 2 optional** — `./scripts/labs/lab-nodes.sh 2.5 ensure --replace-zone --node=$NODE` after 2a, before first drain; pre-provisions same-AZ capacity for pod reschedule during drain or after Phase 4 terminate
+- **Phase 4** — EKS: `aws ec2 terminate-instances`; GKE: `gcloud compute instances delete` (capture instance name + zone **before** `kubectl delete node`)
+- **Alternate demo** — optional `k8sNodeBlockList` section (this guide; Karpenter incompatible)
 
 ### Lab 2.5 — Karpenter path
 

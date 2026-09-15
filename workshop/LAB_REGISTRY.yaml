@@ -396,7 +396,7 @@ labs:
     eks_cluster: my-cluster
     ako_min_version: "4.5.0"
     deploy_paths: [kubectl, helm]
-    node_provisioning: [eksctl, karpenter]
+    node_provisioning: [eksctl, karpenter, nodepool]
     eksctl_only_features: [k8sNodeBlockList]
     artifacts:
       kubectl:
