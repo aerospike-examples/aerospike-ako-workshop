@@ -29,10 +29,14 @@ else
   echo "AKO already installed on upgrade-lab — skipping 01-install-ako.sh"
 fi
 
-if ! command -v kubectl-akoctl >/dev/null 2>&1; then
+# akoctl is a client-side plugin, but `akoctl auth create` grants RBAC per cluster:
+# the operator ServiceAccount must exist in this cluster's namespace too, or the
+# StatefulSet cannot create pods.
+if ! command -v kubectl-akoctl >/dev/null 2>&1 ||
+   ! kubectl -n "${NAMESPACE}" get serviceaccount aerospike-operator-controller-manager >/dev/null 2>&1; then
   "${UPGRADE_DIR}/../04-install-akoctl.sh"
 else
-  echo "akoctl already installed — skipping 04-install-akoctl.sh"
+  echo "akoctl installed and namespace RBAC present — skipping 04-install-akoctl.sh"
 fi
 
 # Same secrets as the main cluster (features.conf + lab auth passwords) — always

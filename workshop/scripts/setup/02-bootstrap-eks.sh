@@ -5,6 +5,13 @@ source "$(dirname "$0")/../lib/common.sh"
 load_env
 apply_workshop_kubeconfig
 
+if [[ "${CLOUD_PROVIDER}" != "eks" ]]; then
+  echo "ERROR: 02-bootstrap-eks.sh requires CLOUD_PROVIDER=eks (got ${CLOUD_PROVIDER})" >&2
+  echo "For GKE run: ./scripts/setup/02-bootstrap-gke.sh" >&2
+  echo "Or copy scripts/env/workshop.env.gke.example to scripts/env/workshop.env and use setup-all.sh" >&2
+  exit 1
+fi
+
 require_cmd eksctl
 require_cmd kubectl
 require_cmd aws

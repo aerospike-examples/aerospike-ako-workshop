@@ -4,7 +4,7 @@
 | ----------------- | -------------------------------------------------------------- |
 | Lab ID            | `2.1`                                                          |
 | Section           | Maintenance & Upgrade                                          |
-| EKS cluster       | `my-cluster`                                                   |
+| Cluster           | `my-cluster`                                                   |
 | Deploy path       | both                                                           |
 | Duration          | ~15 min (~25 min with optional sections)                       |
 | Validation status | `draft`                                                        |

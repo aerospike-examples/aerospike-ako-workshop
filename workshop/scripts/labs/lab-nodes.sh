@@ -47,11 +47,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_cmd kubectl
-require_cmd eksctl
-
-# Resolve up front so the per-zone background subshells below inherit the cached value
-# instead of each repeating the STS/IAM lookups.
-resolve_iam_boundary_arn >/dev/null
+if [[ "${CLOUD_PROVIDER}" == "eks" ]]; then
+  require_cmd eksctl
+  resolve_iam_boundary_arn >/dev/null
+fi
 
 KARPENTER_DIR="${WORKSHOP_ROOT}/scripts/setup/karpenter"
 NODE_WAIT_TIMEOUT=900
@@ -220,6 +219,34 @@ ensure_eksctl_pools_per_zone() {
     for pid in "${pids[@]}"; do
       wait "${pid}"
     done
+  fi
+}
+
+ensure_gke_pools_per_zone() {
+  local base_name="$1"
+  local node_type="$2"
+  local total_count="$3"
+  local pool_label="${4:-}"
+  local ssd_count="${5:-${GKE_LOCAL_SSD_COUNT}}"
+
+  read_aws_zones_array
+  local num_zones="${#AWS_ZONES_ARRAY[@]}"
+  local zone idx=0 ng_name count
+  for zone in "${AWS_ZONES_ARRAY[@]}"; do
+    [[ -z "${zone}" ]] && continue
+    ng_name="$(pool_name_for_zone "${base_name}" "${zone}")"
+    count="$(nodes_for_zone "${total_count}" "${idx}" "${num_zones}")"
+    provider_ensure_nodepool_in_zone "${CLUSTER_NAME}" "${ng_name}" "${node_type}" \
+      "${zone}" "${count}" "${pool_label}" "${ssd_count}"
+    idx=$((idx + 1))
+  done
+}
+
+ensure_managed_pools_per_zone() {
+  if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+    ensure_gke_pools_per_zone "$@"
+  else
+    ensure_eksctl_pools_per_zone "$@"
   fi
 }
 
@@ -599,7 +626,7 @@ ensure_2xl_pool() {
   if [[ "${NODE_PROVISIONING}" == "karpenter" ]]; then
     ensure_karpenter_baseline_pool "${count}"
   else
-    ensure_eksctl_pools_per_zone "${NODEGROUP_NAME}" "${NODE_TYPE}" "${count}" "baseline"
+    ensure_managed_pools_per_zone "${NODEGROUP_NAME}" "${NODE_TYPE}" "${count}" "baseline" "${GKE_LOCAL_SSD_COUNT:-3}"
   fi
 
   print_zone_distribution "${NODE_TYPE}"
@@ -638,28 +665,34 @@ replace_zone_for_maintenance_node() {
     exit 1
   fi
 
-  local target_zone ng_name current target_count nodes_before
+  local target_zone ng_name current target_count nodes_before pool_label_key
+  pool_label_key="$(provider_node_pool_label_key)"
   target_zone="$(kubectl get node "${node_name}" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}')"
   if [[ -z "${target_zone}" ]]; then
     echo "ERROR: could not read topology.kubernetes.io/zone from node ${node_name}" >&2
     exit 1
   fi
 
-  ng_name="$(kubectl get node "${node_name}" -o jsonpath='{.metadata.labels.alpha\.eksctl\.io/nodegroup-name}')"
+  ng_name="$(kubectl get node "${node_name}" -o go-template --template="{{index .metadata.labels \"${pool_label_key}\"}}")"
   if [[ -z "${ng_name}" ]]; then
     ng_name="$(pool_name_for_zone "${NODEGROUP_NAME}" "${target_zone}")"
   fi
 
-  current="$(kubectl get nodes -l "alpha.eksctl.io/nodegroup-name=${ng_name}" --no-headers 2>/dev/null \
+  current="$(kubectl get nodes -l "${pool_label_key}=${ng_name}" --no-headers 2>/dev/null \
     | grep -c ' Ready ' || true)"
   target_count=$((current + 1))
   nodes_before="$(count_2xl_nodes_ready)"
 
   echo "=== Lab 2.5: scale ${ng_name} in ${target_zone} (${current} → ${target_count} Ready) ==="
-  ensure_eksctl_nodegroup_in_zone "${ng_name}" "${NODE_TYPE}" "${target_zone}" "${target_count}" "baseline"
+  if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+    provider_ensure_nodepool_in_zone "${CLUSTER_NAME}" "${ng_name}" "${NODE_TYPE}" \
+      "${target_zone}" "${target_count}" "baseline" "${GKE_LOCAL_SSD_COUNT}"
+  else
+    ensure_eksctl_nodegroup_in_zone "${ng_name}" "${NODE_TYPE}" "${target_zone}" "${target_count}" "baseline"
+  fi
   maybe_wait_nvme_bootstrap "${nodes_before}" "${NODE_COUNT}"
   echo "OK  ${ng_name} scaled to ${target_count} node(s) in ${target_zone}"
-  kubectl get nodes -l "alpha.eksctl.io/nodegroup-name=${ng_name}" -o wide
+  kubectl get nodes -l "${pool_label_key}=${ng_name}" -o wide
 }
 
 scale_up_2xl() {
@@ -670,7 +703,7 @@ scale_up_2xl() {
   if [[ "${NODE_PROVISIONING}" == "karpenter" ]]; then
     apply_karpenter_baseline_pool "${target}"
   else
-    ensure_eksctl_pools_per_zone "${NODEGROUP_NAME}" "${NODE_TYPE}" "${target}" "baseline"
+    ensure_managed_pools_per_zone "${NODEGROUP_NAME}" "${NODE_TYPE}" "${target}" "baseline" "${GKE_LOCAL_SSD_COUNT:-3}"
   fi
   maybe_wait_nvme_bootstrap "${nodes_before}" "${target}"
 }
@@ -683,7 +716,7 @@ ensure_vertical_4xl() {
   if [[ "${NODE_PROVISIONING}" == "karpenter" ]]; then
     ensure_karpenter_vertical_pool "${NODE_COUNT}"
   else
-    ensure_eksctl_pools_per_zone "${NODEGROUP_NAME_VERTICAL}" "${NODE_TYPE_VERTICAL}" "${NODE_COUNT}" "vertical"
+    ensure_managed_pools_per_zone "${NODEGROUP_NAME_VERTICAL}" "${NODE_TYPE_VERTICAL}" "${NODE_COUNT}" "vertical" "${GKE_LOCAL_SSD_COUNT_VERTICAL:-6}"
   fi
 
   print_zone_distribution "${NODE_TYPE_VERTICAL}"

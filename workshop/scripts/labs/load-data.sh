@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Load records into the cluster (5M x 1KB insert via asbench).
+# Load records into the cluster (asbench insert).
 #
 # Usage:
-#   ./scripts/labs/load-data.sh [--upgrade-lab] [--tls] [--pki]
+#   ./scripts/labs/load-data.sh [--upgrade-lab] [--all-flash] [--tls] [--pki]
+#
+# Defaults: 5M × 1 KB on the main (or upgrade-lab) cluster; 25M × 100 B on all-flash.
 set -euo pipefail
 source "$(dirname "$0")/../lib/common.sh"
 source "$(dirname "$0")/../lib/asbench-tls.sh"
@@ -10,16 +12,20 @@ load_env
 require_cmd kubectl
 
 UPGRADE_LAB=false
+ALL_FLASH=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --upgrade-lab) UPGRADE_LAB=true ;;
+    --all-flash) ALL_FLASH=true ;;
     --tls) AEROSPIKE_TLS_MODE=tls ;;
     --pki) AEROSPIKE_TLS_MODE=pki ;;
     -h|--help)
       cat <<EOF
-Usage: $(basename "$0") [--upgrade-lab] [--tls] [--pki]
+Usage: $(basename "$0") [--upgrade-lab] [--all-flash] [--tls] [--pki]
 
 Load records into the Aerospike cluster via asbench insert.
+  --upgrade-lab   Target the Lab 2.6 upgrade-lab cluster
+  --all-flash     Target the Section 4 cluster (25M × 100 B records by default)
   --tls / --pki   Use service TLS (4333) with password or PKI auth
 EOF
       exit 0
@@ -32,6 +38,19 @@ EOF
   shift
 done
 
+if [[ "${UPGRADE_LAB}" == true && "${ALL_FLASH}" == true ]]; then
+  echo "ERROR: --upgrade-lab and --all-flash are mutually exclusive" >&2
+  exit 1
+fi
+
+# Target the all-flash cluster through CLUSTER_NAME rather than local variables:
+# load_env swaps in the ALL_FLASH_LOAD_* sizes for it, and helpers below re-run
+# load_env, which would re-source workshop.env over any override set here.
+if [[ "${ALL_FLASH}" == true ]]; then
+  export CLUSTER_NAME="${ALL_FLASH_CLUSTER_NAME}"
+  load_env
+fi
+
 : "${MIGRATION_LOAD_NAMESPACE:=test}"
 : "${MIGRATION_LOAD_RECORDS:=5000000}"
 : "${MIGRATION_LOAD_OBJECT_SIZE:=1024}"
@@ -41,7 +60,9 @@ done
 : "${AEROSPIKE_AUTH_PASSWORD:=app123}"
 
 ensure_target_kubecontext() {
-  if [[ "${UPGRADE_LAB}" == true ]]; then
+  if [[ "${ALL_FLASH}" == true ]]; then
+    ensure_all_flash_kubecontext
+  elif [[ "${UPGRADE_LAB}" == true ]]; then
     ensure_upgrade_lab_kubecontext
   else
     ensure_main_kubecontext
@@ -105,8 +126,8 @@ EOF
             - I
             - -z
             - "${MIGRATION_LOAD_THREADS}"
-            - --batch-write-size
-            - "100"
+            # - --batch-write-size
+            # - "50"
             - --debug
 EOF
     if [[ "${MIGRATION_LOAD_DURATION}" -gt 0 ]]; then

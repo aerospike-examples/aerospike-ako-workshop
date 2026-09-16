@@ -10,7 +10,8 @@
 
 - Default **Path A (OLM)** for automated workshop bootstrap
 - Offer Path B if audience is Helm-native — decide before class, do not switch mid-session
-- Default **NODE_PROVISIONING=eksctl**; offer Karpenter only if audience uses it in production
+- Default **CLOUD_PROVIDER=eks** and **NODE_PROVISIONING=eksctl**; offer Karpenter only if the audience uses it in production (EKS only)
+- For GCP, copy `workshop.env.gke.example` → `workshop.env` (`CLOUD_PROVIDER=gke`, `NODE_PROVISIONING=nodepool`). Do not mix EKS and GKE env files mid-session
 
 ## Karpenter-specific
 
@@ -37,7 +38,10 @@
 |-------|------------|
 | IAM role create denied by the AWS account | Permissions boundary missing — see `01-validate-client.sh` output and [client-prerequisites.md](../../instructor/client-prerequisites.md#shared-aws-accounts-and-iam-permissions-boundaries) |
 | `AlreadyExists` on cluster / nodegroup / IAM role | Colleague owns that name in the shared account — set a unique `CLUSTER_NAME` before bootstrap |
-| EBS CSI IAM fails | Run 05-setup-ebs-storage.sh steps manually; verify OIDC |
+| Wrong bootstrap script | `02-bootstrap-eks.sh` with a GKE env (or the reverse) fails on purpose — use the matching `02-bootstrap-*.sh` |
+| GKE Autopilot / Karpenter on GCP | Not supported — Standard regional cluster + node pools only |
+| GKE `GCP_PROJECT` / APIs | Copy `workshop.env.gke.example`; enable Container + Compute APIs |
+| EBS CSI IAM fails | Run 05-setup-ssd-storage.sh steps manually; verify OIDC (EKS). GKE only needs StorageClass `ssd` |
 | Local disk init skipped | Re-run `06-setup-local-storage.sh`; check nvme-bootstrap init logs |
 | Karpenter nodes missing NVMe | Verify nvme-bootstrap DaemonSet after 0.5 |
 | CSV stuck Pending | `olm/01-install-ako.sh` already approves the pinned InstallPlan (up to 300s); patch `spec.approved` manually only if that timed out |
@@ -46,19 +50,20 @@
 ## Skip paths
 
 - Pre-stage entire Section 0; start training at Section 1 Lab 1.1
-- Skip local storage (0.5 Part B) if only running Lab 1.1 dim — **required for rack labs (1.2–1.3)**. There is no skip flag: run `setup-all.sh --step 0.5-ebs` and omit `0.5-local`, then continue with `--from 0.6-secrets`. A full `setup-all.sh` run always includes 0.5-local.
+- Skip local storage (0.5 Part B) if only running Lab 1.1 dim — **required for rack labs (1.2–1.3)**. There is no skip flag: run `setup-all.sh --step 0.5-ssd` and omit `0.5-local`, then continue with `--from 0.6-secrets`. A full `setup-all.sh` run always includes 0.5-local.
 
 ## Discussion prompts
 
 - Why install AKO at 4.2.0 instead of latest? (Upgrade ladder Lab 2.2: 4.3.0 → 4.4.1 → 4.5.0)
 - OLM vs Helm tradeoffs — see path-selection-guide.md
 
-## Dual cluster
+## Dedicated clusters (off by default)
 
-Step **0.7** creates the upgrade-lab cluster (`my-cluster-k8s-upgrade`) by default for Lab 2.6 — see [Lab 0.7](07-upgrade-lab-cluster.md). It starts on Kubernetes `UPGRADE_LAB_K8S_VERSION_START` (**1.31**, upgraded to 1.32 in Lab 2.6) with nodegroup `ng-upgrade-lab` (`UPGRADE_LAB_NODE_COUNT=3`× `${UPGRADE_LAB_NODE_TYPE}`), adding ~3× `i8g.2xlarge` cost during Sections 1–2.
+Step **0.7** (Lab 2.6) and step **0.8** (Section 4) are **not** created by a default `setup-all.sh` run. Opt in with `--step 0.7` / `--with-upgrade-lab` and `--step 0.8` (or `prepare-lab.sh 2.6` / `4.1`). See [Lab 0.7](07-upgrade-lab-cluster.md) and [Lab 0.8](08-all-flash-cluster.md).
+
+The upgrade-lab cluster starts on Kubernetes `UPGRADE_LAB_K8S_VERSION_START` (**1.34**, upgraded to 1.35 in Lab 2.6) with pool `ng-upgrade-lab` (`UPGRADE_LAB_NODE_COUNT=3`× `${UPGRADE_LAB_NODE_TYPE}`). Extra cost while it is up is ~3× `i8g.2xlarge` (EKS) or ~3× `n2-highmem-8` (GKE).
 
 - **AKO on upgrade-lab is always OLM** — `upgrade-lab/01-install-ako.sh` calls the OLM installer regardless of `DEPLOY_PATH`, and `03-deploy-cluster.sh` deploys `aerocluster` with `kubectl apply`. Path B classes therefore see an OLM operator and a kubectl-applied cluster on this one cluster; call that out rather than letting trainees discover it in Lab 2.6.
-- **Parallel bootstrap:** default `setup-all.sh` creates main + upgrade-lab EKS in parallel after 0.1 (~15–25 min saved), then completes 0.7 with `upgrade-lab/setup-upgrade-lab-post-bootstrap.sh`. Use `--sequential` for sequential EKS bootstrap; `--step 0.7` runs the full `upgrade-lab/setup-upgrade-lab.sh` (bootstraps the cluster first if missing).
-- Skip with `./scripts/setup/setup-all.sh --skip-upgrade-lab` and run `./scripts/labs/prepare-lab.sh 2.6` before that lab
-- **Parallel teardown:** default `cleanup-lab.sh` deletes both clusters concurrently (~10–20 min saved). Use `--sequential` for serial delete.
+- **`--with-upgrade-lab`:** creates main + upgrade-lab clusters in parallel after 0.1, then completes 0.7 with `upgrade-lab/setup-upgrade-lab-post-bootstrap.sh`. Combine with `--sequential` to bootstrap main first. `--step 0.7` runs the full `upgrade-lab/setup-upgrade-lab.sh` (bootstraps the cluster first if missing).
+- **Parallel teardown:** default `cleanup-lab.sh` deletes every training cluster that exists concurrently (~10–20 min saved). Use `--sequential` for serial delete.
 - Scripts restore kubectl to `my-cluster` after step 0.7; use `./scripts/lib/kubecontext.sh show` to verify

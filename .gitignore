@@ -2,6 +2,7 @@
 **/secrets/features.conf
 
 # Local env overrides and runtime artifacts
+.cursor/
 **/.kube/
 **/*.env
 !**/*.env.example

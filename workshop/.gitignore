@@ -7,3 +7,4 @@ validation/expected/*.txt
 validation/expected/*.json
 .kube/
 .vendor/
+.cursor/

@@ -5,7 +5,7 @@
 | Lab ID             | `1.4`                                                                                           |
 | Section            | Scaling & Capacity                                                                              |
 | Run after          | **[Lab 2.2](../02-maintenance-and-upgrade/02-upgrade-ako.md)** (AKO 4.4.0+)                     |
-| EKS cluster        | `my-cluster`                                                                                    |
+| Cluster            | `my-cluster`                                                                                    |
 | Aerospike cluster  | `aerocluster`                                                                                   |
 | AKO min version    | **4.4.0**                                                                                       |
 | Aerospike baseline | 3-node on per-AZ baseline pools (device storage default; same as Lab 1.1 / 2.2), RF=2           |
@@ -28,7 +28,7 @@ For AP namespaces, AKO **4.4.0+** applies `replication-factor` changes dynamical
 
 | Item     | Value                                                                                                                               |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Instance | `i8g.2xlarge` × 4 on baseline pool (`${NODEGROUP_NAME}-<zone>` or `${KARPENTER_NODEPOOL_NAME}-<zone>`; ≥3 required for dim cluster) |
+| Instance | `${NODE_TYPE}` × 4 on baseline pool (EKS `i8g.2xlarge` / GKE `n2-highmem-8`; `${NODEGROUP_NAME}-<zone>` or `${KARPENTER_NODEPOOL_NAME}-<zone>`; ≥3 required for dim cluster) |
 | Reset    | **Light** (database only — keeps baseline pool)                                                                                     |
 
 ## Phase 0 — Prepare lab
@@ -37,7 +37,7 @@ For AP namespaces, AKO **4.4.0+** applies `replication-factor` changes dynamical
 ./scripts/labs/prepare-lab.sh 1.4
 ```
 
-**Expected:** Light reset tears down any existing Aerospike cluster; baseline pool remains; 4× `i8g.2xlarge` Ready with `node-pool=baseline`.
+**Expected:** Light reset tears down any existing Aerospike cluster; baseline pool remains; 4× `${NODE_TYPE}` Ready with `node-pool=baseline`.
 
 If continuing directly from **Lab 2.2** with the dim cluster still Running and RF=2, skip the reset:
 

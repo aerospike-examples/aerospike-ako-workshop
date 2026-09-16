@@ -23,10 +23,10 @@ spec:
       resources:
         requests:
           cpu: '7'
-          memory: 57Gi
+          memory: 54Gi  # 85% of 64 GiB
         limits:
           cpu: '7'
-          memory: 57Gi
+          memory: 54Gi  # 85% of 64 GiB
     sidecars:
     - name: aerospike-prometheus-exporter
       image: aerospike/aerospike-prometheus-exporter:1.33.0
@@ -163,7 +163,7 @@ spec:
     - name: test
       replication-factor: 2
       migrate-sleep: 0
-      indexes-memory-budget: 49478021959
+      indexes-memory-budget: 46385646796  # 80% of 54 GiB (85% of 64 GiB) = 43.2 GiB
       storage-engine:
         type: device
         devices:

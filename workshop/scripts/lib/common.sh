@@ -44,12 +44,39 @@ load_env() {
     CLUSTER_NAME="${preserve_cluster}"
   fi
   : "${CLUSTER_NAME:=my-cluster}"
+  : "${CLOUD_PROVIDER:=eks}"
   : "${AWS_REGION:=us-east-1}"
+  : "${GCP_PROJECT:=}"
+  : "${GCP_REGION:=us-central1}"
   : "${NAMESPACE:=aerospike}"
   : "${OPERATOR_NAMESPACE:=operators}"
   : "${OPERATOR_REPO:=aerospike-kubernetes-operator}"
   : "${DEPLOY_PATH:=olm}"
-  : "${NODE_PROVISIONING:=eksctl}"
+  case "${CLOUD_PROVIDER}" in
+    eks|gke) ;;
+    *)
+      echo "ERROR: CLOUD_PROVIDER must be eks or gke (got: ${CLOUD_PROVIDER})" >&2
+      exit 1
+      ;;
+  esac
+  if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+    : "${NODE_PROVISIONING:=nodepool}"
+    if [[ "${NODE_PROVISIONING}" == "karpenter" ]]; then
+      echo "ERROR: NODE_PROVISIONING=karpenter is AWS-only; GKE uses NODE_PROVISIONING=nodepool" >&2
+      exit 1
+    fi
+    if [[ "${NODE_PROVISIONING}" != "nodepool" ]]; then
+      echo "ERROR: GKE requires NODE_PROVISIONING=nodepool (got: ${NODE_PROVISIONING})" >&2
+      exit 1
+    fi
+    : "${GKE_SYSTEM_NODEGROUP:=default-pool}"
+    : "${GKE_SYSTEM_NODE_TYPE:=e2-standard-4}"
+    : "${GKE_SYSTEM_NODE_COUNT:=2}"
+    : "${GKE_LOCAL_SSD_COUNT:=3}"
+    : "${GKE_LOCAL_SSD_COUNT_VERTICAL:=6}"
+  else
+    : "${NODE_PROVISIONING:=eksctl}"
+  fi
   : "${KARPENTER_VERSION:=1.11.2}"
   : "${KARPENTER_NAMESPACE:=karpenter}"
   : "${KARPENTER_CONSOLIDATION:=WhenEmpty}"
@@ -71,14 +98,53 @@ load_env() {
   : "${NODEGROUP_NAME:=ng-aerospike}"
   : "${NODEGROUP_NAME_VERTICAL:=ng-aerospike-4xl}"
   : "${AWS_ZONES:=us-east-1c,us-east-1d}"
+  if [[ -n "${CLUSTER_ZONES:-}" ]]; then
+    AWS_ZONES="${CLUSTER_ZONES}"
+  else
+    CLUSTER_ZONES="${AWS_ZONES}"
+  fi
   : "${MIN_NODES_PER_ZONE:=2}"
   : "${UPGRADE_LAB_CLUSTER_NAME:=my-cluster-k8s-upgrade}"
   : "${UPGRADE_LAB_NODEGROUP_NAME:=ng-upgrade-lab}"
-  : "${UPGRADE_LAB_K8S_VERSION_START:=1.31}"
-  : "${UPGRADE_LAB_K8S_VERSION_TARGET:=1.32}"
+  : "${UPGRADE_LAB_K8S_VERSION_START:=1.34}"
+  : "${UPGRADE_LAB_K8S_VERSION_TARGET:=1.35}"
   : "${UPGRADE_LAB_NODE_COUNT:=3}"
   : "${UPGRADE_LAB_NODE_TYPE:=i8g.2xlarge}"
   : "${UPGRADE_LAB_AEROSPIKE_SIZE:=3}"
+  # All-flash cluster (Section 4 only) — dedicated cluster, opt-in setup step 0.8.
+  : "${ALL_FLASH_CLUSTER_NAME:=my-cluster-all-flash}"
+  : "${ALL_FLASH_NODEGROUP_NAME:=ng-all-flash}"
+  : "${ALL_FLASH_AEROSPIKE_SIZE:=3}"
+  : "${ALL_FLASH_AEROSPIKE_SIZE_SCALED:=4}"
+  : "${ALL_FLASH_NODE_COUNT:=${ALL_FLASH_AEROSPIKE_SIZE}}"
+  : "${ALL_FLASH_NODE_COUNT_SCALED:=${ALL_FLASH_AEROSPIKE_SIZE_SCALED}}"
+  # 600 GiB primary index per node: EKS one 640 GiB slice; GKE 16× 40 GiB slices.
+  : "${ALL_FLASH_INDEX_MOUNTS_BUDGET:=644245094400}"
+  if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+    : "${ALL_FLASH_NODE_TYPE:=n2-highmem-16}"
+    : "${ALL_FLASH_GKE_LOCAL_SSD_COUNT:=16}"
+    : "${ALL_FLASH_NVME_DISK_LAYOUT:=${ALL_FLASH_NODE_TYPE}-all-flash}"
+  else
+    : "${ALL_FLASH_NODE_TYPE:=i8ge.3xlarge}"
+    : "${ALL_FLASH_GKE_LOCAL_SSD_COUNT:=16}"
+    : "${ALL_FLASH_NVME_DISK_LAYOUT:=${ALL_FLASH_NODE_TYPE}-all-flash}"
+  fi
+  # Section 4 is not on the Lab 2.2 upgrade ladder; install AKO at this pin.
+  : "${ALL_FLASH_AKO_VERSION:=4.5.0}"
+  # Lab 4.2 seeds tiny records so the flash index (not the data device) is the story.
+  : "${ALL_FLASH_LOAD_RECORDS:=25000000}"
+  : "${ALL_FLASH_LOAD_OBJECT_SIZE:=100}"
+  # Scripts shared with the main curriculum (06-setup-local-storage.sh) read
+  # NODE_TYPE/NVME_DISK_LAYOUT. Apply the all-flash values here rather than in the
+  # caller: helpers such as ensure_target_kubecontext re-run load_env, which would
+  # re-source workshop.env over a caller-side override.
+  if [[ "${CLUSTER_NAME}" == "${ALL_FLASH_CLUSTER_NAME}" ]]; then
+    NODE_TYPE="${ALL_FLASH_NODE_TYPE}"
+    NVME_DISK_LAYOUT="${ALL_FLASH_NVME_DISK_LAYOUT}"
+    AKO_VERSION_START="${ALL_FLASH_AKO_VERSION}"
+    MIGRATION_LOAD_RECORDS="${ALL_FLASH_LOAD_RECORDS}"
+    MIGRATION_LOAD_OBJECT_SIZE="${ALL_FLASH_LOAD_OBJECT_SIZE}"
+  fi
   : "${CLUSTER_STORAGE:=disk}"
   : "${CLUSTER_STORAGE_DIM_LABS:=}"
   : "${CLUSTER_STORAGE_DISK_LABS:=}"
@@ -97,9 +163,11 @@ load_env() {
       ;;
   esac
 
-  IFS=',' read -r NODE_ZONE_A NODE_ZONE_B _ <<< "${AWS_ZONES},,"
-  export NODE_ZONE_A NODE_ZONE_B
+  IFS=',' read -r NODE_ZONE_A NODE_ZONE_B _ <<< "${CLUSTER_ZONES},,"
+  export NODE_ZONE_A NODE_ZONE_B CLUSTER_ZONES AWS_ZONES CLOUD_PROVIDER
   ensure_noninteractive_cli
+  # shellcheck source=provider.sh
+  source "${SCRIPT_DIR}/provider.sh"
 }
 
 aws_account_id() {
@@ -201,7 +269,7 @@ EOF
 
 # Render a ClusterConfig for `eksctl create cluster -f` (control plane only, no nodegroups).
 # withOIDC stays false to match the CLI default this replaces — the OIDC provider is
-# associated later in step 0.5 (05-setup-ebs-storage.sh).
+# associated later in step 0.5 (05-setup-ssd-storage.sh).
 render_cluster_config() {
   local cluster="$1" region="$2" k8s_version="$3" zones="$4"
   local zone
@@ -398,8 +466,7 @@ require_cmd() {
 }
 
 cluster_exists() {
-  local name="$1"
-  eksctl get cluster --name "${name}" --region "${AWS_REGION}" >/dev/null 2>&1
+  provider_cluster_exists "$1"
 }
 
 workshop_kubeconfig_dir() {
@@ -482,20 +549,15 @@ current_kube_context() {
 
 ensure_kubecontext() {
   local cluster_name="$1"
-  require_cmd aws
   require_cmd kubectl
 
   if ! cluster_exists "${cluster_name}"; then
-    echo "ERROR: EKS cluster '${cluster_name}' not found in ${AWS_REGION}" >&2
+    echo "ERROR: $(provider_display_name) cluster '${cluster_name}' not found" >&2
     echo "Create it first or check UPGRADE_LAB_CLUSTER_NAME / CLUSTER_NAME in workshop.env" >&2
     exit 1
   fi
 
-  if [[ -n "${KUBECONFIG:-}" ]]; then
-    aws eks update-kubeconfig --name "${cluster_name}" --region "${AWS_REGION}" --kubeconfig "${KUBECONFIG}" >/dev/null
-  else
-    aws eks update-kubeconfig --name "${cluster_name}" --region "${AWS_REGION}" >/dev/null
-  fi
+  provider_update_kubeconfig "${cluster_name}"
   echo "kubectl context: $(current_kube_context) (cluster: $(current_kube_cluster))"
 }
 
@@ -506,7 +568,7 @@ assert_kubecontext() {
 
   if [[ "${current_cluster}" != *"${expected_cluster}"* ]]; then
     echo "ERROR: kubectl is not targeting '${expected_cluster}' (current cluster: ${current_cluster:-unknown})" >&2
-    echo "Run: aws eks update-kubeconfig --name ${expected_cluster} --region ${AWS_REGION}" >&2
+    echo "Run: $(provider_kubeconfig_hint "${expected_cluster}")" >&2
     exit 1
   fi
 }
@@ -523,10 +585,18 @@ ensure_upgrade_lab_kubecontext() {
   assert_kubecontext "${UPGRADE_LAB_CLUSTER_NAME}"
 }
 
+ensure_all_flash_kubecontext() {
+  load_env
+  ensure_kubecontext "${ALL_FLASH_CLUSTER_NAME}"
+  assert_kubecontext "${ALL_FLASH_CLUSTER_NAME}"
+}
+
 ensure_target_kubecontext() {
   load_env
   if [[ "${CLUSTER_NAME}" == "${UPGRADE_LAB_CLUSTER_NAME}" ]]; then
     ensure_upgrade_lab_kubecontext
+  elif [[ "${CLUSTER_NAME}" == "${ALL_FLASH_CLUSTER_NAME}" ]]; then
+    ensure_all_flash_kubecontext
   else
     ensure_main_kubecontext
   fi

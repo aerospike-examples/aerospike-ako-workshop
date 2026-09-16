@@ -4,7 +4,7 @@
 | ------------------ | ----- |
 | Lab ID             | `3.4` |
 | Section            | Security & Authentication |
-| EKS cluster        | `my-cluster` |
+| Cluster            | `my-cluster` |
 | Aerospike cluster  | `aerocluster` |
 | AKO min version    | `4.2.0` |
 | Aerospike baseline | 3-node **8.1.0.0** mTLS + PKI (continues from Lab 3.3) |

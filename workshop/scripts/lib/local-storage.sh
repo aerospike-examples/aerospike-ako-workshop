@@ -5,11 +5,15 @@
 : "${LOCAL_VOLUME_PROVISIONER_RESTART_TIMEOUT:=120}"
 : "${LOCAL_VOLUME_PROVISIONER_SETTLE_SECS:=10}"
 : "${LOCAL_SSD_STORAGE_CLASS:=local-ssd}"
+: "${LOCAL_SSD_FS_STORAGE_CLASS:=local-ssd-fs}"
+: "${LOCAL_SSD_DISCOVERY_DIR:=/mnt/disks/data}"
+: "${LOCAL_SSD_FS_DISCOVERY_DIR:=/mnt/disks/index}"
 
 # PV field selectors only support metadata.name/namespace; filter by
 # spec.storageClassName client-side (local-volume-provisioner does not set a label).
 _local_ssd_pv_filter() {
   local mode="$1"
+  local storage_class="${2:-${LOCAL_SSD_STORAGE_CLASS}}"
   python3 -c "
 import json, sys
 
@@ -36,7 +40,7 @@ elif mode == 'node-hosts':
         exprs = terms[0].get('matchExpressions', [])
         if exprs and exprs[0].get('values'):
             print(exprs[0]['values'][0])
-" "${LOCAL_SSD_STORAGE_CLASS}" "${mode}"
+" "${storage_class}" "${mode}"
 }
 
 kubectl_get_local_ssd_pvs() {
@@ -66,7 +70,7 @@ wait_nvme_bootstrap_ready() {
     return 0
   fi
 
-  echo "Waiting for nvme-bootstrap on i8g nodes (timeout ${timeout}s)..."
+  echo "Waiting for nvme-bootstrap on workload nodes (timeout ${timeout}s)..."
   local deadline=$((SECONDS + timeout))
   while true; do
     ready="$(nvme_bootstrap_ready)"
@@ -103,15 +107,23 @@ count_local_ssd_pvs() {
   kubectl get pv -o json | _local_ssd_pv_filter count
 }
 
+nvme_bootstrap_dir() {
+  echo "${WORKSHOP_ROOT}/scripts/setup/nvme-bootstrap"
+}
+
 disk_layouts_config() {
-  echo "${WORKSHOP_ROOT}/config/disk-layouts.yaml"
+  echo "$(nvme_bootstrap_dir)/disk-layouts.yaml"
+}
+
+nvme_init_script() {
+  echo "$(nvme_bootstrap_dir)/nvme-init.py"
 }
 
 expected_local_ssd_pvs_for_instance_type() {
   local instance_type="$1"
   local config script
   config="$(disk_layouts_config)"
-  script="${WORKSHOP_ROOT}/scripts/setup/nvme-init.py"
+  script="$(nvme_init_script)"
   if [[ -z "${instance_type}" || ! -f "${config}" || ! -f "${script}" ]]; then
     echo ""
     return 0
@@ -122,6 +134,85 @@ expected_local_ssd_pvs_for_instance_type() {
 
 expected_local_ssd_pvs_per_node() {
   expected_local_ssd_pvs_for_instance_type "${NVME_DISK_LAYOUT:-${NODE_TYPE:-}}"
+}
+
+layout_mode_for_instance_type() {
+  local instance_type="$1"
+  local config script
+  config="$(disk_layouts_config)"
+  script="$(nvme_init_script)"
+  if [[ -z "${instance_type}" || ! -f "${config}" || ! -f "${script}" ]]; then
+    echo ""
+    return 0
+  fi
+  python3 "${script}" --layout-mode \
+    --config "${config}" --instance-type "${instance_type}" 2>/dev/null || echo ""
+}
+
+# local-volume-provisioner never retracts a PV whose backing path disappears, so
+# switching a node from the whole-device layout to a partitioned one leaves an
+# Available PV for the entire disk overlapping the new partition PVs. Delete those
+# before Aerospike can bind one. Only unbound PVs are touched.
+prune_stale_whole_device_pvs() {
+  local layout_key="${1:-${NVME_DISK_LAYOUT:-${NODE_TYPE:-}}}"
+  local stale pv
+
+  if [[ "$(layout_mode_for_instance_type "${layout_key}")" != "partitioned" ]]; then
+    return 0
+  fi
+
+  stale="$(kubectl get pv -o json 2>/dev/null | python3 -c "
+import json, re, sys
+
+classes = {'${LOCAL_SSD_STORAGE_CLASS}', '${LOCAL_SSD_FS_STORAGE_CLASS}'}
+for pv in json.load(sys.stdin).get('items', []):
+    spec = pv.get('spec', {})
+    if spec.get('storageClassName') not in classes:
+        continue
+    if pv.get('status', {}).get('phase') != 'Available':
+        continue
+    path = spec.get('local', {}).get('path', '')
+    if path and not re.search(r'p\d+\$', path):
+        print(pv['metadata']['name'])
+" || true)"
+
+  while IFS= read -r pv; do
+    [[ -z "${pv}" ]] && continue
+    echo "Deleting stale whole-device PV ${pv} (partitioned layout ${layout_key})"
+    kubectl delete pv "${pv}" --ignore-not-found
+  done <<< "${stale}"
+}
+
+# local-volume-provisioner never retracts a PV whose hostDir moved. Unbound PVs
+# still pointing at /mnt/disks/<device> (or /var/lib/workshop/disks-fs) overlap
+# the new /mnt/disks/data and /mnt/disks/index discovery dirs.
+prune_stale_discovery_path_pvs() {
+  local stale pv
+
+  stale="$(kubectl get pv -o json 2>/dev/null | python3 -c "
+import json, sys
+
+prefixes = {
+    '${LOCAL_SSD_STORAGE_CLASS}': '${LOCAL_SSD_DISCOVERY_DIR}',
+    '${LOCAL_SSD_FS_STORAGE_CLASS}': '${LOCAL_SSD_FS_DISCOVERY_DIR}',
+}
+for pv in json.load(sys.stdin).get('items', []):
+    spec = pv.get('spec', {})
+    prefix = prefixes.get(spec.get('storageClassName', ''))
+    if not prefix:
+        continue
+    if pv.get('status', {}).get('phase') != 'Available':
+        continue
+    path = spec.get('local', {}).get('path', '')
+    if path and not path.startswith(prefix + '/') and path != prefix:
+        print(pv['metadata']['name'])
+" || true)"
+
+  while IFS= read -r pv; do
+    [[ -z "${pv}" ]] && continue
+    echo "Deleting stale PV ${pv} (discovery dir moved to ${LOCAL_SSD_DISCOVERY_DIR} / ${LOCAL_SSD_FS_DISCOVERY_DIR})"
+    kubectl delete pv "${pv}" --ignore-not-found
+  done <<< "${stale}"
 }
 
 count_local_ssd_pvs_for_instance_type() {
@@ -145,15 +236,18 @@ ensure_local_ssd_pvs_for_pool() {
   local instance_type="$1"
   local node_count="$2"
   local pool_label="$3"
+  # Layout key defaults to the instance type; the all-flash pool overrides it
+  # because its layout is selected by name, not by machine shape.
+  local layout_key="${4:-$1}"
   local per_node expected actual
 
   if [[ "${node_count:-0}" -eq 0 ]]; then
     return 0
   fi
 
-  per_node="$(expected_local_ssd_pvs_for_instance_type "${instance_type}")"
+  per_node="$(expected_local_ssd_pvs_for_instance_type "${layout_key}")"
   if [[ -z "${per_node}" ]]; then
-    echo "SKIP ${pool_label}: unknown expected PV count for ${instance_type}"
+    echo "SKIP ${pool_label}: unknown expected PV count for ${layout_key}"
     return 0
   fi
 
@@ -199,10 +293,66 @@ ensure_baseline_local_ssd_pvs_for_setup() {
   local node_count
   node_count="$(count_baseline_workload_nodes)"
   if [[ "${node_count}" -gt 0 ]]; then
-    ensure_local_ssd_pvs_for_pool "${NODE_TYPE}" "${node_count}" "baseline"
+    ensure_local_ssd_pvs_for_pool "${NODE_TYPE}" "${node_count}" "baseline" \
+      "${NVME_DISK_LAYOUT:-${NODE_TYPE}}"
   else
     echo "SKIP local-ssd PV check (no baseline workload nodes yet)"
   fi
+}
+
+# --- Section 4 all-flash -----------------------------------------------------
+# The all-flash layout publishes two PV families per node: raw block data slices
+# (local-ssd) and index slices (local-ssd-fs, volumeMode Filesystem — kubelet formats).
+
+expected_index_mounts_per_node() {
+  local instance_type="${ALL_FLASH_NVME_DISK_LAYOUT:-}"
+  local config script
+  config="$(disk_layouts_config)"
+  script="$(nvme_init_script)"
+  if [[ -z "${instance_type}" || ! -f "${config}" || ! -f "${script}" ]]; then
+    echo ""
+    return 0
+  fi
+  python3 "${script}" --expected-index-mounts-per-node \
+    --config "${config}" --instance-type "${instance_type}" 2>/dev/null || echo ""
+}
+
+count_index_mount_pvs() {
+  kubectl get pv -o json | _local_ssd_pv_filter count "${LOCAL_SSD_FS_STORAGE_CLASS}"
+}
+
+ensure_all_flash_local_pvs() {
+  local node_count="${1:-${ALL_FLASH_NODE_COUNT}}"
+  local fail=0 per_node expected actual
+
+  # Data slices reuse the shared block-PV wait/restart logic.
+  ensure_local_ssd_pvs_for_pool "${ALL_FLASH_NODE_TYPE}" "${node_count}" \
+    "all-flash data (${ALL_FLASH_NODE_TYPE})" "${ALL_FLASH_NVME_DISK_LAYOUT}" || fail=1
+
+  per_node="$(expected_index_mounts_per_node)"
+  if [[ -z "${per_node}" || "${per_node}" -eq 0 ]]; then
+    echo "SKIP all-flash index mounts: no fstype slices in layout ${ALL_FLASH_NVME_DISK_LAYOUT}"
+    return "${fail}"
+  fi
+
+  expected=$((node_count * per_node))
+  actual="$(count_index_mount_pvs)"
+  if [[ "${actual:-0}" -lt "${expected}" ]]; then
+    echo "WARN all-flash index mounts: ${actual}/${expected} — restarting provisioner..."
+    restart_local_volume_provisioner
+    sleep "${LOCAL_VOLUME_PROVISIONER_SETTLE_SECS}"
+    actual="$(count_index_mount_pvs)"
+  fi
+
+  if [[ "${actual:-0}" -ge "${expected}" ]]; then
+    echo "OK  all-flash index mounts: ${actual} ${LOCAL_SSD_FS_STORAGE_CLASS} PVs (expected ${expected})"
+    return "${fail}"
+  fi
+
+  echo "FAIL all-flash index mounts: ${actual}/${expected} ${LOCAL_SSD_FS_STORAGE_CLASS} PVs for ${node_count} node(s)" >&2
+  echo "  Check: kubectl -n kube-system logs ds/nvme-bootstrap -c init-nvme --tail=40" >&2
+  echo "  Check: kubectl get pv -o custom-columns=NAME:.metadata.name,CLASS:.spec.storageClassName,CAP:.spec.capacity.storage" >&2
+  return 1
 }
 
 validate_lab_1_2_baseline_local_storage() {

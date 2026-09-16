@@ -1,16 +1,16 @@
 # Lab 2.5 — K8s Worker Node Maintenance
 
-> **Node provisioning:** This guide is for `NODE_PROVISIONING=eksctl`. If you use Karpenter, use [Lab 2.5 — K8s Worker Node Maintenance (Karpenter)](05-k8s-node-maintenance-karpenter.md) instead — do not mix guides mid-session.
+> **Node provisioning:** This guide is for `NODE_PROVISIONING=eksctl` (EKS managed node groups) and `NODE_PROVISIONING=nodepool` (GKE Standard). If you use Karpenter, use [Lab 2.5 — K8s Worker Node Maintenance (Karpenter)](05-k8s-node-maintenance-karpenter.md) instead — do not mix guides mid-session.
 
 | Field              | Value                                                                             |
 | ------------------ | --------------------------------------------------------------------------------- |
 | Lab ID             | `2.5`                                                                             |
 | Section            | Maintenance & Upgrade                                                             |
-| EKS cluster        | `my-cluster`                                                                      |
+| Cluster            | `my-cluster`                                                                      |
 | AKO min version    | `4.5.0`                                                                           |
 | Aerospike baseline | 3-node device storage on local-ssd (**8.1.2.x**); in-memory with `--dim`          |
 | Deploy path        | both                                                                              |
-| Node provisioning  | **eksctl**                                                                        |
+| Node provisioning  | **eksctl** (EKS) or **nodepool** (GKE)                                            |
 | Duration           | ~25 min                                                                           |
 | Validation status  | `draft`                                                                           |
 | Official docs      | [Node maintenance](https://aerospike.com/docs/kubernetes/manage/node-maintenance) |
@@ -167,11 +167,11 @@ If you used Option B (`--load-data`), skip Option A and proceed to Phase 2 after
 
 ## How local storage affects drain
 
-Before draining, understand why local storage behaves differently from network-attached EBS volumes:
+Before draining, understand why local storage behaves differently from network-attached `ssd` volumes:
 
 | Volume         | StorageClass                 | Node loss / drain behavior                   |
 | -------------- | ---------------------------- | -------------------------------------------- |
-| Workdir        | `ssd` (EBS)                  | Detaches and reattaches on another node      |
+| Workdir        | `ssd` (network-attached)     | Detaches and reattaches on another node      |
 | Namespace data | `local-ssd` (instance store) | **Pinned** to the node via PVC node affinity |
 
 **local-ssd PVCs cannot move.** A pod with a bound local PVC stays on that node (or enters `Pending`) until the claim is deleted. This is independent of the eviction webhook.
@@ -360,11 +360,30 @@ kubectl -n aerospike describe pod aerocluster-0-0 | tail -20
 
 Simulate completing node maintenance — terminate the cordoned worker and let the PVC cleanup controller free any orphaned claims.
 
+Capture the instance identity **before** deleting the Kubernetes node — once the node object is gone, `.spec.providerID` is no longer readable. `$NODE` comes from Phase 2a; re-derive it here if you opened a new terminal since then.
+
 ```bash
+source scripts/env/workshop.env
+
+NODE=${NODE:-$(kubectl get nodes -o jsonpath='{.items[?(@.spec.unschedulable==true)].metadata.name}')}
 INSTANCE_ID=$(kubectl get node "$NODE" -o jsonpath='{.spec.providerID}' | sed 's|.*/||')
-kubectl delete node "$NODE"
-aws ec2 terminate-instances --region "${AWS_REGION}" --instance-ids "$INSTANCE_ID"
+ZONE=$(kubectl get node "$NODE" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}')
+echo "NODE=$NODE INSTANCE_ID=$INSTANCE_ID ZONE=$ZONE"
 ```
+
+**All three must be non-empty** before continuing. Then delete the node and terminate the instance:
+
+```bash
+kubectl delete node "$NODE"
+
+# EKS — ASG recreates the worker
+aws ec2 terminate-instances --region "${AWS_REGION}" --instance-ids "$INSTANCE_ID"
+
+# GKE — node-pool MIG recreates the worker
+gcloud compute instances delete "$INSTANCE_ID" --zone="$ZONE" --project="${GCP_PROJECT}" --quiet
+```
+
+Run **one** of the two terminate commands. On GKE, `$INSTANCE_ID` is the Compute Engine instance name (last segment of `.spec.providerID`, `gce://PROJECT/ZONE/INSTANCE`) and matches the Kubernetes node name. `--quiet` skips the gcloud confirmation prompt.
 
 Watch cleanup and reschedule:
 
@@ -510,6 +529,8 @@ Proceed to [Lab 2.6](06-k8s-control-plane-upgrade.md). Aerospike cluster should 
 | local-ssd PVC Pending                           | Re-run `./scripts/setup/08-validate-environment.sh`; confirm baseline local-ssd PVs                                                      |
 | No `eviction-blocked` annotation                | Normal once pod is Terminating; check CR phase and migrate stats instead                                                                 |
 | PVC not cleaned up after node delete            | Check cleanup controller logs; wait 60s (`--pvc-deletion-delay=60s`)                                                                     |
+| `gcloud ... could not parse resource []` or `aws ... --instance-ids` empty | `$NODE` (and therefore `$INSTANCE_ID`) was empty — a new terminal does not carry Phase 2a variables. Re-run the Phase 4 capture block and confirm the `echo` prints all three values |
+| Node already deleted, `$INSTANCE_ID` lost       | On GKE the instance name equals the node name: `gcloud compute instances list --filter="name=$NODE" --project="${GCP_PROJECT}"`          |
 | CR stays `InProgress`                           | Check operator logs; wait for migrate stats to reach zero                                                                                |
 | Force delete bypasses webhook                   | Never use `--force` in production demo                                                                                                   |
 | Blocklist changes cluster profile               | Use updated blocklist manifest matching your storage (`disk-node-blocklist.yaml` default)                                                |

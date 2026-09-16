@@ -13,7 +13,18 @@ fi
 source "${VERSIONS}"
 
 IFS=',' read -ra LADDER <<< "${AKO_UPGRADE_LADDER}"
-for ver in "${LADDER[@]:1}"; do
-  echo "=== Upgrade step: ${ver} ==="
-  "${UPGRADE_DIR}/upgrade-step-olm.sh" "${ver}"
+STEPS=("${LADDER[@]:1}")
+
+for i in "${!STEPS[@]}"; do
+  ver="${STEPS[$i]}"
+  echo "=== Upgrade step: ${ver} ($((i + 1))/${#STEPS[@]}) ==="
+  if ! "${UPGRADE_DIR}/upgrade-step-olm.sh" "${ver}"; then
+    echo "ERROR: ladder stopped at ${ver} — remaining steps were not run" >&2
+    for remaining in "${STEPS[@]:i}"; do
+      echo "  ./scripts/labs/upgrade-ako/upgrade-step-olm.sh ${remaining}" >&2
+    done
+    exit 1
+  fi
 done
+
+echo "=== Ladder complete: ${STEPS[*]} ==="

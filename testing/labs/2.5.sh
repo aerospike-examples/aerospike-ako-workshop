@@ -5,7 +5,8 @@
 # node hosting aerocluster-0-0 -> drain (best-effort first attempt, since the
 # webhook may or may not catch active migration depending on timing) -> wait
 # for migration to settle -> retry drain (must succeed) -> terminate the node
-# (eksctl: kubectl delete node + EC2 terminate; karpenter: delete nodeclaim)
+# (eksctl: kubectl delete node + EC2 terminate; GKE: kubectl delete node +
+# gcloud compute instances delete; karpenter: delete nodeclaim)
 # -> wait for PVC cleanup + pod reschedule + CR Completed.
 #
 # Excluded (optional/instructor-led): eksctl same-AZ pre-scale, node-blocklist
@@ -73,6 +74,14 @@ if [[ "${NODE_PROVISIONING}" == "karpenter" ]]; then
   claim="$(kubectl get nodeclaims -o jsonpath="{.items[?(@.status.nodeName==\"${NODE}\")].metadata.name}" 2>/dev/null)"
   assert_not_empty "${claim}" "NodeClaim for ${NODE} found" || fail_lab "Lab 2.5: could not find NodeClaim for ${NODE}"
   kubectl delete nodeclaim "${claim}"
+elif [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+  log_info "GKE path: deleting Compute Engine VM backing ${NODE}..."
+  instance_id="$(kubectl get node "${NODE}" -o jsonpath='{.spec.providerID}' 2>/dev/null | sed 's|.*/||')"
+  zone="$(kubectl get node "${NODE}" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}' 2>/dev/null)"
+  assert_not_empty "${instance_id}" "GCE instance name for ${NODE}" || fail_lab "Lab 2.5: could not resolve GCE instance name for ${NODE}"
+  assert_not_empty "${zone}" "GCE zone for ${NODE}" || fail_lab "Lab 2.5: could not resolve topology zone for ${NODE}"
+  kubectl delete node "${NODE}"
+  gcloud compute instances delete "${instance_id}" --zone="${zone}" --project="${GCP_PROJECT}" --quiet
 else
   log_info "eksctl path: terminating EC2 instance backing ${NODE}..."
   instance_id="$(kubectl get node "${NODE}" -o jsonpath='{.spec.providerID}' 2>/dev/null | sed 's|.*/||')"

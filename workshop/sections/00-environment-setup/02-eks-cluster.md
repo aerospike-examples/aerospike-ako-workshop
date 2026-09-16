@@ -4,11 +4,13 @@
 |-------|-------|
 | Lab ID | `0.2` |
 | Section | Environment Setup |
-| EKS cluster | `${CLUSTER_NAME}` (default `my-cluster`) |
-| Kubernetes | `${K8S_VERSION}` (default 1.33) |
+| Cluster | `${CLUSTER_NAME}` (default `my-cluster`) |
+| Kubernetes | `${K8S_VERSION}` (default 1.35) |
 | Node provisioning | eksctl (this guide) |
 | Duration | ~15–30 min |
 | Validation status | `draft` |
+
+**GKE path:** this guide is EKS-only. When `CLOUD_PROVIDER=gke`, use [02-gke-cluster.md](02-gke-cluster.md) (`./scripts/setup/02-bootstrap-gke.sh`). Running this script with a GKE env file fails on purpose.
 
 ## Takeaway
 
@@ -89,6 +91,7 @@ Reference config: [clusters/main-cluster.yaml](../../clusters/main-cluster.yaml)
 Cluster remains running. Proceed to AKO install (0.3). Workload nodes: step 0.2-nodes (or `./scripts/setup/setup-all.sh --step 0.2-nodes`).
 
 **Karpenter path:** see [02-eks-cluster-karpenter.md](02-eks-cluster-karpenter.md) when `NODE_PROVISIONING=karpenter`.
+**GKE path:** see [02-gke-cluster.md](02-gke-cluster.md) when `CLOUD_PROVIDER=gke`.
 
 ## Workshop artifacts
 

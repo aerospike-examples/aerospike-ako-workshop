@@ -4,10 +4,17 @@ set -euo pipefail
 source "$(dirname "$0")/../../lib/common.sh"
 load_env
 apply_workshop_kubeconfig
-require_cmd eksctl
 require_cmd kubectl
 
 : "${UPGRADE_LAB_NODEGROUP_NAME:=ng-upgrade-lab}"
+
+if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+  require_cmd gcloud
+  provider_ensure_upgrade_lab_nodes
+  exit 0
+fi
+
+require_cmd eksctl
 
 upgrade_lab_nodegroup_exists() {
   eksctl get nodegroup \

@@ -23,14 +23,15 @@ For **Karpenter path** runs, use [karpenter-walkthrough.md](karpenter-walkthroug
 - [ ] **0.3** Install AKO — CSV/Helm release at 4.2.0, operator Running
 - [ ] **0.4** Install akoctl — auth create succeeds
 - [ ] **0.6** Secrets + validate — secrets exist, no AerospikeCluster CR
-- [ ] **0.7** Upgrade-lab cluster — `my-cluster-k8s-upgrade` Ready; AKO + storage + secrets staged for Lab 2.6 (skip with `--skip-upgrade-lab` if deferring)
+- [ ] **0.7** Upgrade-lab cluster *(optional — only when validating Lab 2.6)* — `my-cluster-k8s-upgrade` Ready; AKO + storage + secrets staged (`--step 0.7` or `--with-upgrade-lab`)
+- [ ] **0.8** All-flash cluster *(optional — only when validating Section 4)* — `my-cluster-all-flash` Ready on `i8ge.3xlarge` / `n2-highmem-16`; `all-flash-sysctl` DaemonSet Ready on every node; `local-ssd` **and** `local-ssd-fs` PVs published per node; **no** `aerocluster` yet (Lab 4.1 deploys it)
 
 ## Section 1 — Scaling & Capacity
 
 - [ ] **1.1** Horizontal scaling — `load-data.sh` (5M records); size 3→5→3; observe rebalance on scale-up and migration wait on scale-down; phase Completed
 - [ ] **1.1 (Karpenter)** — observe `nodeclaims` during scale-up
-- [ ] **1.2** Rack awareness + vertical scale + revision — pods include rack ID; `nodeSelector` baseline→vertical; nodes i8g.4xlarge, memory 115Gi, pods on v2 revision, 2× local-ssd PVCs per pod
-- [ ] **1.3** Rack replacement (standalone) — racks 3+4 only on vertical 4xl; memory 115Gi; no rack 1/2 pods
+- [ ] **1.2** Rack awareness + vertical scale + revision — pods include rack ID; `nodeSelector` baseline→vertical; nodes `${NODE_TYPE_VERTICAL}` (EKS `i8g.4xlarge` / GKE `n2-highmem-16`), memory 115Gi, pods on v2 revision, 2× local-ssd PVCs per pod
+- [ ] **1.3** Rack replacement (standalone) — racks 3+4 only on vertical `${NODE_TYPE_VERTICAL}`; memory 115Gi; no rack 1/2 pods
 
 ## Section 2 — Maintenance & Upgrade
 
@@ -49,7 +50,7 @@ For **Karpenter path** runs, use [karpenter-walkthrough.md](karpenter-walkthroug
 - [ ] **2.5 (eksctl only)** — blocklist path validated (same migration observation)
 - [ ] **2.5 (Karpenter only)** — drain + Phase 4 NodeClaim replacement; **no blocklist**
 - [ ] **2.5 (Karpenter only) add-on** — do-not-disrupt graduation + `terminationGracePeriod` (instructor-led)
-- [ ] **2.6** K8s control plane upgrade — Phase 1 data + `run-lab-workload.sh --upgrade-lab` in Terminal B; 3 pods Running through CP upgrade; nodegroup rolling replace with CR/migrate observe; `validate-post-upgrade.sh` PASS (upgrade-lab eksctl cluster)
+- [ ] **2.6** K8s control plane upgrade *(optional)* — Phase 1 data + `run-lab-workload.sh --upgrade-lab` in Terminal B; 3 pods Running through CP upgrade; node-pool rolling replace with CR/migrate observe; `validate-post-upgrade.sh` PASS (upgrade-lab: eksctl MNG on EKS, GKE node pool on GKE)
 
 ## Section 3 — Security & Authentication
 
@@ -60,6 +61,18 @@ For **Karpenter path** runs, use [karpenter-walkthrough.md](karpenter-walkthroug
 - [ ] **3.5** Client rotation — overlap v1/v2; `apply-cert-blacklist.sh`; v1 rejected after blacklist
 - [ ] **3.5 Step 4 Path A** — blacklist via `DEPLOY_PATH=olm` (manifest / `deploy-cluster-tls-mtls-blacklist.sh`)
 - [ ] **3.5 Step 4 Path B** — blacklist via `DEPLOY_PATH=helm` (`deploy-cluster-tls-mtls-blacklist-helm.sh`; no manual blacklist manifest apply)
+
+## Section 4 — All-flash Storage (optional, dedicated cluster)
+
+Skip this block unless the delivery includes Section 4; it runs entirely on `my-cluster-all-flash` and needs setup **0.8** first.
+
+- [ ] **4.1** Deploy all-flash — CR phase Completed with 3 pods; data PVCs on `local-ssd` (Block) and index PVCs on `local-ssd-fs` (Filesystem) all Bound; `validate-all-flash.sh` PASS
+- [ ] **4.1** `asinfo namespace/test` shows `index-type=flash` and `index-type.mounts-budget=644245094400` (600 GiB/node); `partition-tree-sprigs=16384`
+- [ ] **4.1 Path A** — `deploy-all-flash-cluster.sh` (kubectl, provider-specific manifest)
+- [ ] **4.1 Path B** — `deploy-all-flash-cluster-helm.sh` (provider-specific base values)
+- [ ] **4.2** Scale all-flash — 25M × 100 B records loaded first (`load-data.sh --all-flash`); node pool grows 3→4, new node's PVs published, CR size 4 reaches Completed, index still flash; `validate-all-flash.sh 4` PASS
+- [ ] **4.2 Path A** — `all-flash-cluster-scale-4.yaml` / `all-flash-cluster-gke-scale-4.yaml`; **Path B** — `overlay-all-flash-scale-4-values.yaml`
+- [ ] Teardown — `cleanup-lab.sh --all-flash-only` removes only the dedicated cluster; `my-cluster` context restored
 
 ## Path coverage
 

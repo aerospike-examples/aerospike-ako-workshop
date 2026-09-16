@@ -65,7 +65,7 @@ When you finish Section 3 (or want to abandon TLS labs and return to a plain bas
 
 **Removed:** `AerospikeCluster` `aerocluster`; TLS secrets (`tls-ca-secret`, `tls-server-secret`, client TLS secrets, `tls-client-app-v1-secret`, `tls-cert-blacklist-secret`, etc.); by default, files under `secrets/tls/`.
 
-**Preserved:** EKS cluster, AKO, storage layer, and Lab 0.6 secrets (`aerospike-secret`, `auth-secret`, `auth-app-secret`, `auth-exporter-secret`).
+**Preserved:** Kubernetes cluster, AKO, storage layer, and Lab 0.6 secrets (`aerospike-secret`, `auth-secret`, `auth-app-secret`, `auth-exporter-secret`).
 
 **Next steps:**
 

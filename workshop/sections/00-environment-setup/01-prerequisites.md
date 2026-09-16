@@ -4,30 +4,30 @@
 |-------|-------|
 | Lab ID | `0.1` |
 | Section | Environment Setup |
-| EKS cluster | — (client machine only) |
+| Cluster | — (client machine only) |
 | Duration | ~15 min |
 | Validation status | `draft` |
 
 ## Takeaway
 
-The instructor client has all required tools, AWS access, and licensing files before touching EKS.
+The instructor client has all required tools, cloud access, and licensing files before creating the cluster.
 
 ## Prerequisites
 
-- macOS or Linux workstation (or bastion) with network access to AWS
+- macOS or Linux workstation (or bastion)
 - Aerospike Enterprise **feature-key file** (`features.conf`)
-- AWS account (SSO or access keys) allowed to create EKS clusters, EC2 instances, CloudFormation stacks, and IAM roles
+- **EKS (default):** AWS account allowed to create EKS clusters, EC2, CloudFormation, and IAM roles
+- **GKE:** GCP project with GKE Standard + Compute; copy [`workshop.env.gke.example`](../../scripts/env/workshop.env.gke.example) instead of the EKS example
 
 ### What `01-validate-client.sh` checks
 
 | Category | Checks |
 |----------|--------|
-| Required tools | `aws`, `kubectl`, `eksctl`, `git`, `curl`, `bash`, `krew` |
-| Conditional tools | `helm` — when `DEPLOY_PATH=helm` **or** `NODE_PROVISIONING=karpenter` (Karpenter controller install) |
+| Required tools | `kubectl`, `git`, `curl`, `bash`, `krew`; plus **EKS:** `aws`, `eksctl` **or GKE:** `gcloud`, `gke-gcloud-auth-plugin` |
+| Conditional tools | `helm` — when `DEPLOY_PATH=helm` **or** `NODE_PROVISIONING=karpenter` |
 | Optional tools | `jq` (recommended), `akoctl` (installed in Lab 0.4) |
-| AWS access | `aws sts get-caller-identity`; IAM permissions boundary per `IAM_PERMISSIONS_BOUNDARY`; EC2 key pair `${SSH_PUBLIC_KEY}` in `${AWS_REGION}` |
+| Cloud access | EKS: STS, IAM boundary, EC2 key pair, i8g capacity. GKE: `gcloud auth`, `gke-gcloud-auth-plugin`, `GCP_PROJECT`, Container API |
 | Workshop files | `secrets/features.conf`; `vendor/storage/local_volume_provisioner_cleanup.yaml` and `local_volume_provisioner_cleanup_rbac.yaml` |
-| Capacity | delegates to [`01b-check-ec2-capacity.sh`](../../scripts/setup/01b-check-ec2-capacity.sh) when everything above passes |
 
 Presence and `--version` are what get verified — the script does not assert minimum tool versions, so check those against [client prerequisites](../../instructor/client-prerequisites.md) yourself.
 
@@ -40,9 +40,10 @@ Presence and `--version` are what get verified — the script does not assert mi
    ```bash
    cd workshop
    cp scripts/env/workshop.env.example scripts/env/workshop.env
+   # GKE: cp scripts/env/workshop.env.gke.example scripts/env/workshop.env
    ```
 
-   If the AWS account is shared with other people, set a unique `CLUSTER_NAME` (and `UPGRADE_LAB_CLUSTER_NAME`) — EKS and IAM names are account-global. If the account only permits role creation with a permissions boundary attached, leave `IAM_PERMISSIONS_BOUNDARY=auto` and set `IAM_PERMISSIONS_BOUNDARY_NAME` to that policy — see [client prerequisites](../../instructor/client-prerequisites.md#shared-aws-accounts-and-iam-permissions-boundaries).
+   If the cloud account is shared, set a unique `CLUSTER_NAME` (and `UPGRADE_LAB_CLUSTER_NAME`). On **EKS**, cluster and IAM names are account-global; if the account only permits role creation with a permissions boundary attached, leave `IAM_PERMISSIONS_BOUNDARY=auto` — see [client prerequisites](../../instructor/client-prerequisites.md#shared-aws-accounts-and-iam-permissions-boundaries). On **GKE**, cluster names are project-global; set `GCP_PROJECT` in `workshop.env`.
 
 3. Place feature-key file:
 
@@ -51,15 +52,19 @@ Presence and `--version` are what get verified — the script does not assert mi
    cp /path/to/your/features.conf secrets/features.conf
    ```
 
-4. Run client validation (includes EC2 AZ capacity pre-flight for `i8g.2xlarge` and `i8g.4xlarge`):
+4. Run client validation:
 
    ```bash
    ./scripts/setup/01-validate-client.sh
    ```
 
-   **Expected:** All checks print `OK`; exit code 0. Capacity pre-flight confirms each instance type is offered in every `AWS_ZONES` entry, runs `${MIN_NODES_PER_ZONE}` on-demand dry-runs per zone for both `${NODE_TYPE}` and `${NODE_TYPE_VERTICAL}`, and verifies the **Running On-Demand G and VT** quota is at least `NODE_COUNT × 2` (the Lab 1.2 peak of 4× `i8g.2xlarge` plus 4× `i8g.4xlarge`). An unreadable quota prints `SKIP` — verify it manually in that case.
+   **Expected:** All checks print `OK`; exit code 0. The first line is `Cloud provider: eks (EKS)` or `Cloud provider: gke (GKE)`.
 
-   **Sample output:**
+   **EKS** also runs EC2 AZ capacity pre-flight for `${NODE_TYPE}` and `${NODE_TYPE_VERTICAL}` in every `AWS_ZONES` entry, plus **Running On-Demand G and VT** quota (`NODE_COUNT × 2` at Lab 1.2 peak). Re-run capacity only: `./scripts/setup/01b-check-ec2-capacity.sh`.
+
+   **GKE** checks `gcloud` auth, `gke-gcloud-auth-plugin` (on `PATH` or in the Cloud SDK `bin` directory), `GCP_PROJECT`, and the Container API. It prints quota hints (N2 CPUs, Local SSD) rather than dry-running instance creates.
+
+   **Sample EKS output:**
 
    ```text
    OK  aws
@@ -80,11 +85,11 @@ Presence and `--version` are what get verified — the script does not assert mi
    Client validation passed.
    ```
 
-   Re-run capacity only: `./scripts/setup/01b-check-ec2-capacity.sh`
+   Re-run EKS capacity only: `./scripts/setup/01b-check-ec2-capacity.sh`
 
 ## Verify (pass/fail)
 
-1. `aws sts get-caller-identity` returns Account, Arn, UserId
+1. **EKS:** `aws sts get-caller-identity` returns Account, Arn, UserId. **GKE:** `gcloud auth print-access-token` succeeds, `gke-gcloud-auth-plugin` is installed, and `GCP_PROJECT` is set.
 2. `kubectl krew version` succeeds (akoctl is optional here; install in Lab 0.4)
 3. `secrets/features.conf` exists
 
@@ -93,6 +98,9 @@ Presence and `--version` are what get verified — the script does not assert mi
 | Symptom | Fix |
 |---------|-----|
 | AWS identity fails | `aws sso login` or `aws configure` |
+| `FAIL GCP_PROJECT` / gcloud auth | Copy `workshop.env.gke.example`, set `GCP_PROJECT`, run `gcloud auth login` |
+| `FAIL gke-gcloud-auth-plugin` | `gcloud components install gke-gcloud-auth-plugin` — required for `kubectl` against GKE. Homebrew `gcloud` may leave the binary under the SDK `bin` dir (not on `PATH`); `gcloud container clusters get-credentials` still works if the file exists there |
+| Container API not enabled | `gcloud services enable container.googleapis.com compute.googleapis.com --project=$GCP_PROJECT` |
 | `FAIL IAM permissions boundary` | Account requires a boundary that was not found — ask your AWS admins for the policy name, or set `IAM_PERMISSIONS_BOUNDARY` to its ARN |
 | `AlreadyExists` on cluster / nodegroup / IAM role | Name already used by someone else in the account — pick a unique `CLUSTER_NAME` |
 | krew not found | https://krew.sigs.k8s.io/docs/user-guide/setup/install/ |
@@ -104,7 +112,7 @@ Presence and `--version` are what get verified — the script does not assert mi
 
 ## Workshop artifacts
 
-- Environment template: [scripts/env/workshop.env.example](../../scripts/env/workshop.env.example)
+- Environment templates: [scripts/env/workshop.env.example](../../scripts/env/workshop.env.example) (EKS) · [scripts/env/workshop.env.gke.example](../../scripts/env/workshop.env.gke.example) (GKE)
 - No manifest or Helm YAML in this step — client validation only.
 
 ## References
@@ -113,4 +121,4 @@ Presence and `--version` are what get verified — the script does not assert mi
 
 ## Teardown / handoff
 
-Proceed to Lab 0.2 — [eksctl managed nodegroups](02-eks-cluster.md) (`NODE_PROVISIONING=eksctl`, default) or [Karpenter](02-eks-cluster-karpenter.md) (`NODE_PROVISIONING=karpenter`).
+Proceed to Lab 0.2 — [EKS eksctl](02-eks-cluster.md) (`CLOUD_PROVIDER=eks`, `NODE_PROVISIONING=eksctl`, default), [EKS Karpenter](02-eks-cluster-karpenter.md) (`NODE_PROVISIONING=karpenter`), or [GKE Standard](02-gke-cluster.md) (`CLOUD_PROVIDER=gke`).

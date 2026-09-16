@@ -6,7 +6,7 @@
 |-------|-------|
 | Lab ID | `2.5` |
 | Section | Maintenance & Upgrade |
-| EKS cluster | `my-cluster` |
+| Cluster | `my-cluster` |
 | Node provisioning | **Karpenter** |
 | AKO min version | `4.5.0` |
 | Aerospike baseline | 3-node device storage on local-ssd (**8.1.2.x**); in-memory with `--dim` |
@@ -167,11 +167,11 @@ If you used Option B (`--load-data`), skip Option A and proceed to Phase 2 after
 
 ## How local storage affects drain
 
-Before draining, understand why local storage behaves differently from network-attached EBS volumes:
+Before draining, understand why local storage behaves differently from network-attached `ssd` volumes:
 
 | Volume | StorageClass | Node loss / drain behavior |
 |--------|--------------|----------------------------|
-| Workdir | `ssd` (EBS) | Detaches and reattaches on another node |
+| Workdir | `ssd` (network-attached) | Detaches and reattaches on another node |
 | Namespace data | `local-ssd` (instance store) | **Pinned** to the node via PVC node affinity |
 
 **local-ssd PVCs cannot move.** A pod with a bound local PVC stays on that node (or enters `Pending`) until the claim is deleted. This is independent of the eviction webhook.

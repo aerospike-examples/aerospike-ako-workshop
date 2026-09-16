@@ -1,6 +1,6 @@
 # Karpenter Path Walkthrough Checklist
 
-Run the **full main-cluster curriculum** with `NODE_PROVISIONING=karpenter` before signing off the Karpenter path. Lab 2.6 still uses the separate upgrade-lab cluster on eksctl MNG.
+Run the **full main-cluster curriculum** with `NODE_PROVISIONING=karpenter` before signing off the Karpenter path. Lab 2.6 still uses the separate upgrade-lab cluster (eksctl MNG on EKS; GKE node pool when `CLOUD_PROVIDER=gke`).
 
 Use [walkthrough-checklist.md](walkthrough-checklist.md) for the shared eksctl/Karpenter checklist (Section 0–2.6). This file lists **Karpenter-specific deltas only**.
 
@@ -57,7 +57,7 @@ karpenter_validation:
   validated_with:
     karpenter: "1.x.x"
     ako: "4.5.0"
-    k8s: "1.33"   # match K8S_VERSION in workshop.env
+    k8s: "1.35"   # match K8S_VERSION in workshop.env
   validator: "<name>"
 ```
 

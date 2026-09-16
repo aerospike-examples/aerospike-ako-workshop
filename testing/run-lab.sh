@@ -29,8 +29,9 @@ SCRIPT="${TESTING_ROOT}/labs/${LAB_ID}.sh"
 if [[ ! -f "${SCRIPT}" ]]; then
   echo "ERROR: no automated test for lab ${LAB_ID}." >&2
   echo "Available labs: $(list_available_labs)" >&2
-  echo "NOTE: Lab 2.6 (K8s control plane upgrade) is the only lab intentionally out of scope — it is tested separately on the upgrade-lab cluster." >&2
+  echo "NOTE: Lab 2.6 (K8s control plane upgrade) is intentionally out of scope — it is tested separately on the upgrade-lab cluster." >&2
   echo "NOTE: Section 3 labs (3.1-3.5) chain in order — run 3.1 first (or run the full suite)." >&2
+  echo "NOTE: Labs 4.1/4.2 (all-flash) run on the opt-in dedicated cluster — bootstrap it with setup-all.sh --step 0.8 first." >&2
   exit 1
 fi
 

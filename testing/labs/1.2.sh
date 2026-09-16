@@ -33,7 +33,7 @@ assert_not_empty "${v1_pod}" "baseline (v1) pod found"
 selector="$(pod_field "${v1_pod}" '{.spec.nodeSelector.workshop\.aerospike\.com/node-pool}')"
 mem="$(pod_field "${v1_pod}" '{.spec.containers[?(@.name=="aerospike-server")].resources.limits.memory}')"
 assert_eq "${selector}" "baseline" "Phase 1 nodeSelector (${v1_pod})" || fail_lab "Lab 1.2 Phase 1 nodeSelector mismatch"
-assert_eq "${mem}" "57Gi" "Phase 1 memory limit (${v1_pod})" || fail_lab "Lab 1.2 Phase 1 memory mismatch"
+assert_eq "${mem}" "54Gi" "Phase 1 memory limit (${v1_pod})" || fail_lab "Lab 1.2 Phase 1 memory mismatch"
 
 "${LABS}/lab-nodes.sh" 1.2 ensure --vertical
 "${LABS}/lab-nodes.sh" 1.2 validate --vertical

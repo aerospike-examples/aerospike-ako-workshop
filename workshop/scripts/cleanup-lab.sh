@@ -4,20 +4,25 @@ source "$(dirname "$0")/lib/common.sh"
 source "$(dirname "$0")/lib/nodepool-zones.sh"
 source "$(dirname "$0")/lib/karpenter-teardown.sh"
 load_env
-require_cmd eksctl
 require_cmd kubectl
-require_cmd aws
+if [[ "${CLOUD_PROVIDER}" == "eks" ]]; then
+  require_cmd eksctl
+  require_cmd aws
+else
+  require_cmd gcloud
+fi
 
 KARPENTER_IAM_TEARDOWN="$(dirname "$0")/setup/karpenter/99-teardown-controller-iam.sh"
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [--main-only | --upgrade-lab-only] [--yes] [--sequential]
+Usage: $(basename "$0") [--main-only | --upgrade-lab-only | --all-flash-only] [--yes] [--sequential]
 
-Delete EKS training cluster(s).
+Delete training cluster(s) ($(provider_display_name)).
 
-Default (no flags): delete BOTH clusters in parallel:
+Default (no flags): delete ALL training clusters in parallel (missing ones are skipped):
   - ${UPGRADE_LAB_CLUSTER_NAME} (upgrade-lab)
+  - ${ALL_FLASH_CLUSTER_NAME} (all-flash, Section 4)
   - ${CLUSTER_NAME} (main)
 
 If NODE_PROVISIONING=karpenter, deleting the main cluster also:
@@ -29,14 +34,16 @@ If NODE_PROVISIONING=karpenter, deleting the main cluster also:
 Options:
   --main-only          Delete main cluster only
   --upgrade-lab-only   Delete upgrade-lab cluster only (after Lab 2.6)
+  --all-flash-only     Delete all-flash cluster only (after Section 4)
   --yes                Skip confirmation prompt
-  --sequential         Delete both clusters one at a time (upgrade-lab, then main)
+  --sequential         Delete the clusters one at a time (upgrade-lab, all-flash, then main)
   -h, --help           Show this help
 EOF
 }
 
 main_only=false
 upgrade_only=false
+all_flash_only=false
 assume_yes=false
 sequential=false
 
@@ -44,6 +51,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --main-only) main_only=true ;;
     --upgrade-lab-only) upgrade_only=true ;;
+    --all-flash-only) all_flash_only=true ;;
     --yes) assume_yes=true ;;
     --sequential) sequential=true ;;
     -h|--help) usage; exit 0 ;;
@@ -56,18 +64,24 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-if [[ "${main_only}" == true && "${upgrade_only}" == true ]]; then
-  echo "ERROR: --main-only and --upgrade-lab-only are mutually exclusive" >&2
+selected=0
+[[ "${main_only}" == true ]] && selected=$((selected + 1))
+[[ "${upgrade_only}" == true ]] && selected=$((selected + 1))
+[[ "${all_flash_only}" == true ]] && selected=$((selected + 1))
+if [[ "${selected}" -gt 1 ]]; then
+  echo "ERROR: --main-only, --upgrade-lab-only, and --all-flash-only are mutually exclusive" >&2
   exit 1
 fi
 
 clusters=()
 if [[ "${upgrade_only}" == true ]]; then
   clusters=("${UPGRADE_LAB_CLUSTER_NAME}")
+elif [[ "${all_flash_only}" == true ]]; then
+  clusters=("${ALL_FLASH_CLUSTER_NAME}")
 elif [[ "${main_only}" == true ]]; then
   clusters=("${CLUSTER_NAME}")
 else
-  clusters=("${UPGRADE_LAB_CLUSTER_NAME}" "${CLUSTER_NAME}")
+  clusters=("${UPGRADE_LAB_CLUSTER_NAME}" "${ALL_FLASH_CLUSTER_NAME}" "${CLUSTER_NAME}")
 fi
 
 use_parallel_teardown() {
@@ -76,7 +90,12 @@ use_parallel_teardown() {
 
 print_teardown_plan() {
   echo "=== Teardown plan ==="
-  echo "Region: ${AWS_REGION}"
+  echo "Provider: $(provider_display_name) (${CLOUD_PROVIDER})"
+  if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+    echo "Region: ${GCP_REGION}  project: ${GCP_PROJECT}"
+  else
+    echo "Region: ${AWS_REGION}"
+  fi
   if use_parallel_teardown; then
     echo "Mode:   parallel delete"
   else
@@ -140,8 +159,8 @@ delete_cluster_async() {
     if is_karpenter_main_cluster "${name}"; then
       drain_karpenter_before_delete "${name}"
     fi
-    echo "[delete-${name}] Deleting EKS cluster ${name}..."
-    eksctl delete cluster --name "${name}" --region "${AWS_REGION}" --wait || exit 1
+    echo "[delete-${name}] Deleting $(provider_display_name) cluster ${name}..."
+    provider_delete_cluster "${name}" || exit 1
     echo "[delete-${name}] Deleted ${name}"
     if is_karpenter_main_cluster "${name}"; then
       sweep_orphan_karpenter_instances "${name}"
@@ -182,7 +201,7 @@ done
 if [[ ${#to_delete[@]} -eq 0 ]]; then
   echo "No clusters to delete."
 elif use_parallel_teardown; then
-  echo "=== Parallel EKS teardown ==="
+  echo "=== Parallel $(provider_display_name) teardown ==="
   pids=()
   for name in "${to_delete[@]}"; do
     delete_cluster_async "${name}" &

@@ -3,7 +3,6 @@ set -euo pipefail
 source "$(dirname "$0")/../../lib/common.sh"
 load_env
 require_cmd kubectl
-require_cmd aws
 
 ensure_upgrade_lab_kubecontext
 
@@ -13,23 +12,27 @@ fail=0
 
 echo "=== Post-upgrade validation ==="
 
-cluster_version="$(aws eks describe-cluster --name "${UPGRADE_LAB_CLUSTER_NAME}" --region "${AWS_REGION}" \
-  --query 'cluster.version' --output text)"
-cluster_status="$(aws eks describe-cluster --name "${UPGRADE_LAB_CLUSTER_NAME}" --region "${AWS_REGION}" \
-  --query 'cluster.status' --output text)"
-echo "EKS cluster: version=${cluster_version} status=${cluster_status}"
+cluster_version="$(provider_control_plane_version "${UPGRADE_LAB_CLUSTER_NAME}")"
+cluster_status="$(provider_control_plane_status "${UPGRADE_LAB_CLUSTER_NAME}")"
+echo "$(provider_display_name) cluster: version=${cluster_version} status=${cluster_status}"
 
-if [[ "${cluster_version}" == "${UPGRADE_LAB_K8S_VERSION_TARGET}" ]]; then
-  echo "OK  EKS version ${cluster_version}"
+version_ok=false
+if type provider_version_matches >/dev/null 2>&1 && provider_version_matches "${cluster_version}" "${UPGRADE_LAB_K8S_VERSION_TARGET}"; then
+  version_ok=true
+elif [[ "${cluster_version}" == "${UPGRADE_LAB_K8S_VERSION_TARGET}" ]]; then
+  version_ok=true
+fi
+if [[ "${version_ok}" == true ]]; then
+  echo "OK  $(provider_display_name) version ${cluster_version}"
 else
-  echo "FAIL EKS version ${cluster_version} (expected ${UPGRADE_LAB_K8S_VERSION_TARGET})"
+  echo "FAIL $(provider_display_name) version ${cluster_version} (expected ${UPGRADE_LAB_K8S_VERSION_TARGET})"
   fail=1
 fi
 
-if [[ "${cluster_status}" == "ACTIVE" ]]; then
-  echo "OK  cluster ACTIVE"
+if [[ "${cluster_status}" == "ACTIVE" || "${cluster_status}" == "RUNNING" ]]; then
+  echo "OK  cluster ${cluster_status}"
 else
-  echo "FAIL cluster status ${cluster_status} (expected ACTIVE)"
+  echo "FAIL cluster status ${cluster_status} (expected ACTIVE or RUNNING)"
   fail=1
 fi
 
@@ -52,7 +55,8 @@ else
 fi
 
 kubelet_minor="${UPGRADE_LAB_K8S_VERSION_TARGET}"
-node_count="$(kubectl get nodes -l "alpha.eksctl.io/nodegroup-name=${UPGRADE_LAB_NODEGROUP_NAME}" --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+pool_label_key="$(provider_node_pool_label_key)"
+node_count="$(kubectl get nodes -l "${pool_label_key}=${UPGRADE_LAB_NODEGROUP_NAME}" --no-headers 2>/dev/null | wc -l | tr -d ' ')"
 kubelet_ok=0
 while read -r node kubelet; do
   [[ -z "${node}" ]] && continue
@@ -60,7 +64,7 @@ while read -r node kubelet; do
   if [[ "${kubelet}" == *"${kubelet_minor}"* ]]; then
     kubelet_ok=$((kubelet_ok + 1))
   fi
-done < <(kubectl get nodes -l "alpha.eksctl.io/nodegroup-name=${UPGRADE_LAB_NODEGROUP_NAME}" \
+done < <(kubectl get nodes -l "${pool_label_key}=${UPGRADE_LAB_NODEGROUP_NAME}" \
   -o custom-columns=NAME:.metadata.name,KUBELET:.status.nodeInfo.kubeletVersion --no-headers 2>/dev/null)
 
 if [[ "${kubelet_ok:-0}" -ge "${node_count:-0}" ]] && [[ "${node_count:-0}" -ge "${UPGRADE_LAB_NODE_COUNT}" ]]; then
@@ -79,14 +83,16 @@ if [[ "${engine}" == device ]]; then
   echo "Block PVCs: ${pvc_count}"
 fi
 
+# cluster_size is a field of the `statistics` command; there is no cluster-size command.
 cluster_size="$(kubectl run "aerospike-tool-verify-$$" -n "${NAMESPACE}" --restart=Never \
   --image=aerospike/aerospike-tools:latest --rm -i -- \
-  asinfo -h aerocluster -U admin -P admin123 -v cluster-size 2>/dev/null | tr -d '[:space:]' || true)"
+  asinfo -h aerocluster -U admin -P admin123 -v statistics 2>/dev/null \
+  | tr ';' '\n' | sed -n 's/^cluster_size=//p' | tr -d '[:space:]' || true)"
 
 if [[ "${cluster_size}" == "${UPGRADE_LAB_AEROSPIKE_SIZE}" ]]; then
-  echo "OK  asinfo cluster-size=${cluster_size}"
+  echo "OK  asinfo cluster_size=${cluster_size}"
 else
-  echo "FAIL asinfo cluster-size=${cluster_size:-unknown} (expected ${UPGRADE_LAB_AEROSPIKE_SIZE})"
+  echo "FAIL asinfo cluster_size=${cluster_size:-unknown} (expected ${UPGRADE_LAB_AEROSPIKE_SIZE})"
   fail=1
 fi
 

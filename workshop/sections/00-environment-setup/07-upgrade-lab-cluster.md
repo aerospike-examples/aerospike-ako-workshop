@@ -4,9 +4,9 @@
 |-------|-------|
 | Lab ID | `0.7` |
 | Section | Environment Setup |
-| EKS cluster | `${UPGRADE_LAB_CLUSTER_NAME}` (default `my-cluster-k8s-upgrade`) |
-| Kubernetes | `${UPGRADE_LAB_K8S_VERSION_START}` (default 1.31 → 1.32 in Lab 2.6) |
-| Node provisioning | eksctl MNG **always** — independent of `NODE_PROVISIONING` |
+| Cluster | `${UPGRADE_LAB_CLUSTER_NAME}` (default `my-cluster-k8s-upgrade`) |
+| Kubernetes | `${UPGRADE_LAB_K8S_VERSION_START}` (default 1.34 → 1.35 in Lab 2.6) |
+| Node provisioning | **EKS:** eksctl MNG always (independent of `NODE_PROVISIONING`). **GKE:** node pool always. |
 | Aerospike cluster | `aerocluster`, `${UPGRADE_LAB_AEROSPIKE_SIZE}` nodes (default 3) |
 | Deploy path | OLM **always** — independent of `DEPLOY_PATH` |
 | Duration | ~15–25 min post-bootstrap |
@@ -14,20 +14,23 @@
 
 ## Takeaway
 
-A second, self-contained EKS cluster on an older Kubernetes version, already running AKO and an Aerospike cluster, so Lab 2.6 can upgrade a control plane without touching the main workshop cluster.
+A second, self-contained cluster (EKS or GKE, same `CLOUD_PROVIDER` as the main workshop) on an older Kubernetes version, already running AKO and an Aerospike cluster, so Lab 2.6 can upgrade a control plane without touching the main workshop cluster.
 
 ## Prerequisites
 
 - Lab 0.6 complete on the main cluster
 - `secrets/features.conf` present (same file as the main cluster)
-- Capacity for `${UPGRADE_LAB_NODE_COUNT}`× `${UPGRADE_LAB_NODE_TYPE}` in `${NODE_ZONE}`, on top of the main cluster's nodes
+- Capacity for `${UPGRADE_LAB_NODE_COUNT}`× `${UPGRADE_LAB_NODE_TYPE}` in the upgrade-lab zone (`NODE_ZONE` / `UPGRADE_LAB_NODE_ZONE` on EKS; first `CLUSTER_ZONES` entry on GKE), on top of the main cluster's nodes
 
-## Starting state
+## Opt-in
 
-Either of:
+A default `setup-all.sh` run creates the **main cluster only**. Step 0.7 is never part of it — this second cluster exists solely for Lab 2.6:
 
-- **Default (parallel) run:** `setup-all.sh` already created the upgrade-lab EKS cluster alongside step 0.2, so only the post-bootstrap work remains
-- **Nothing yet:** no upgrade-lab cluster exists
+```bash
+./scripts/setup/setup-all.sh --step 0.7
+```
+
+`prepare-lab.sh 2.6` also bootstraps it when it is missing. To fold 0.7 into a full Section 0 run (main + upgrade-lab bootstrap in parallel), use `--with-upgrade-lab`.
 
 ## Steps
 
@@ -43,13 +46,13 @@ Either of:
    ./scripts/setup/upgrade-lab/setup-upgrade-lab.sh
    ```
 
-   [`setup-upgrade-lab.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab.sh) creates the cluster with [`00-bootstrap-eks.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-eks.sh) when it does not exist, or just re-ensures the nodegroup when it does, then hands off to the post-bootstrap script. A default full `setup-all.sh` skips straight to [`setup-upgrade-lab-post-bootstrap.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab-post-bootstrap.sh), because the parallel bootstrap already built the cluster.
+   [`setup-upgrade-lab.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab.sh) creates the cluster with [`00-bootstrap-eks.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-eks.sh) or [`00-bootstrap-gke.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-gke.sh) when it does not exist, or just re-ensures the node pool when it does, then hands off to the post-bootstrap script. `--with-upgrade-lab` on a full `setup-all.sh` run bootstraps the cluster in parallel with step 0.2, then skips straight to [`setup-upgrade-lab-post-bootstrap.sh`](../../scripts/setup/upgrade-lab/setup-upgrade-lab-post-bootstrap.sh).
 
 2. Watch what the post-bootstrap script does — each stage is skipped when already satisfied, so re-runs are safe:
 
    | Stage | Detail |
    |-------|--------|
-   | Bootstrap | Rendered ClusterConfig at `${UPGRADE_LAB_K8S_VERSION_START}`; nodegroup `ng-upgrade-lab` (`${UPGRADE_LAB_NODE_COUNT}`× `${UPGRADE_LAB_NODE_TYPE}` in `${NODE_ZONE}`), nodes labelled `workshop.aerospike.com/node-pool=baseline`; namespace `${NAMESPACE}` created |
+   | Bootstrap | **EKS:** rendered ClusterConfig at `${UPGRADE_LAB_K8S_VERSION_START}`. **GKE:** `gcloud` Standard cluster. Node pool `ng-upgrade-lab` (`${UPGRADE_LAB_NODE_COUNT}`× `${UPGRADE_LAB_NODE_TYPE}`), nodes labelled `workshop.aerospike.com/node-pool=baseline`; namespace `${NAMESPACE}` created |
    | AKO | [`01-install-ako.sh`](../../scripts/setup/upgrade-lab/01-install-ako.sh) → the **OLM** installer, even when `DEPLOY_PATH=helm` |
    | akoctl | Reuses [`04-install-akoctl.sh`](../../scripts/setup/04-install-akoctl.sh) for namespace RBAC |
    | Secrets | [`02-setup-storage-secrets.sh`](../../scripts/setup/upgrade-lab/02-setup-storage-secrets.sh) → same [`07-deploy-secrets.sh`](../../scripts/setup/07-deploy-secrets.sh) as the main cluster, always re-applied |
@@ -87,9 +90,10 @@ kubectl -n aerospike get aerospikecluster aerocluster
 
 | Symptom | Fix |
 |---------|-----|
-| Want to defer the cost | `./scripts/setup/setup-all.sh --skip-upgrade-lab`, then `./scripts/labs/prepare-lab.sh 2.6` before Lab 2.6. With that flag set, `--step 0.7` is refused |
-| Parallel bootstrap failed | Partial clusters may remain — `./scripts/cleanup-lab.sh --yes` resets, then re-run setup |
-| Nodegroup timeout | `ensure-nodegroup.sh` waits 900s then dumps nodes and nodegroups; check `${UPGRADE_LAB_NODE_TYPE}` capacity in `${NODE_ZONE}` |
+| Cluster missing at Lab 2.6 | `./scripts/setup/setup-all.sh --step 0.7`, or `./scripts/labs/prepare-lab.sh 2.6` |
+| `--step 0.7` refused | You also passed `--skip-upgrade-lab`; drop that flag (0.7 is already off by default) |
+| Parallel bootstrap failed (`--with-upgrade-lab`) | Partial clusters may remain — `./scripts/cleanup-lab.sh --yes` resets, then re-run setup |
+| Node pool timeout | `ensure-nodegroup.sh` waits 900s then dumps nodes; check `${UPGRADE_LAB_NODE_TYPE}` capacity in the upgrade-lab zone |
 | `aerocluster` redeploying unexpectedly | `CLUSTER_STORAGE` (or a `CLUSTER_STORAGE_*_LABS` override for 2.6) changed since the last run, so the storage engine no longer matches |
 | kubectl still on the upgrade-lab cluster | `./scripts/lib/kubecontext.sh main` |
 
@@ -105,11 +109,13 @@ Proceed to [Section 1 — Scaling & Capacity](../01-scaling-and-capacity/README.
 
 ## Workshop artifacts
 
-- EKS reference config: [clusters/upgrade-lab-cluster.yaml](../../clusters/upgrade-lab-cluster.yaml) (documentation only — bootstrap renders its own ClusterConfig)
+- **EKS** reference config: [clusters/upgrade-lab-cluster.yaml](../../clusters/upgrade-lab-cluster.yaml) (documentation only — bootstrap renders its own ClusterConfig)
+- **GKE:** [`00-bootstrap-gke.sh`](../../scripts/setup/upgrade-lab/00-bootstrap-gke.sh) — no checked-in ClusterConfig
 - Aerospike manifests: [manifests/disk-cluster.yaml](../../manifests/disk-cluster.yaml) · [manifests/dim-cluster.yaml](../../manifests/dim-cluster.yaml)
-- Environment: `UPGRADE_LAB_*` keys in [scripts/env/workshop.env.example](../../scripts/env/workshop.env.example)
+- Environment: `UPGRADE_LAB_*` keys in [workshop.env.example](../../scripts/env/workshop.env.example) (EKS) or [workshop.env.gke.example](../../scripts/env/workshop.env.gke.example) (GKE)
 
 ## References
 
 - [`scripts/setup/upgrade-lab/`](../../scripts/setup/upgrade-lab/)
 - [Updating an EKS cluster](https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html)
+- [GKE cluster upgrades](https://cloud.google.com/kubernetes-engine/docs/how-to/upgrading-a-cluster)

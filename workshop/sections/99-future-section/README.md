@@ -6,9 +6,9 @@ This directory is a placeholder for upcoming training sections. Do not add lab g
 
 | ID | Title | Status |
 |----|-------|--------|
-| 04 | Monitoring & Observability | Planned |
-| 05 | Backup & Restore | Planned |
-| 06 | Strong Consistency | Planned |
+| 05 | Monitoring & Observability | Planned |
+| 06 | Backup & Restore | Planned |
+| 07 | Strong Consistency | Planned |
 
 ## Adding a new section
 

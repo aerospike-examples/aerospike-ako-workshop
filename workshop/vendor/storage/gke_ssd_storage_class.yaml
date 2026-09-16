@@ -1,0 +1,12 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: ssd
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: pd-ssd
+  csi.storage.k8s.io/fstype: ext4
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer

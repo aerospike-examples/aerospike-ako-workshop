@@ -4,18 +4,37 @@ set -euo pipefail
 source "$(dirname "$0")/../lib/common.sh"
 source "$(dirname "$0")/../lib/local-storage.sh"
 load_env
+
 ensure_target_kubecontext
+
+# load_env points NODE_TYPE/NVME_DISK_LAYOUT at the all-flash values (index
+# Filesystem slices + data block slices) whenever CLUSTER_NAME is the all-flash cluster.
+IS_ALL_FLASH_CLUSTER=false
+if [[ "${CLUSTER_NAME}" == "${ALL_FLASH_CLUSTER_NAME}" ]]; then
+  IS_ALL_FLASH_CLUSTER=true
+  echo "All-flash cluster: layout ${NVME_DISK_LAYOUT} on ${NODE_TYPE}"
+fi
 
 require_cmd kubectl
 
-SETUP_DIR="$(dirname "$0")"
 VENDOR_STORAGE="$(vendor_storage_dir)"
 MANIFESTS_DIR="${WORKSHOP_ROOT}/manifests"
-DISK_LAYOUTS="${WORKSHOP_ROOT}/config/disk-layouts.yaml"
+NVME_DIR="$(nvme_bootstrap_dir)"
+DISK_LAYOUTS="$(disk_layouts_config)"
+NVME_INIT="$(nvme_init_script)"
 LAYOUT_RENDERED="$(mktemp)"
 
 kubectl apply -f "${VENDOR_STORAGE}/local_storage_class.yaml"
 kubectl apply -f "${MANIFESTS_DIR}/aerospike_local_volume_provisioner.yaml"
+
+# local-ssd-fs (index slices as Filesystem PVs) exists only on the Section 4
+# all-flash cluster — no other layout defines fstype slices.
+if [[ "${IS_ALL_FLASH_CLUSTER}" == true ]]; then
+  kubectl apply -f "${VENDOR_STORAGE}/local_fs_storage_class.yaml"
+  kubectl apply -f "${MANIFESTS_DIR}/all-flash-local-provisioner-config.yaml"
+  kubectl -n aerospike patch ds local-volume-provisioner \
+    --patch-file "${MANIFESTS_DIR}/all-flash-local-provisioner-patch.yaml"
+fi
 
 for f in local_volume_provisioner_cleanup_rbac.yaml local_volume_provisioner_cleanup.yaml; do
   if [[ ! -f "${VENDOR_STORAGE}/${f}" ]]; then
@@ -33,20 +52,44 @@ if [[ ! -f "${DISK_LAYOUTS}" ]]; then
 fi
 sed "s/^force_layout:.*$/force_layout: \"${NVME_DISK_LAYOUT}\"/" "${DISK_LAYOUTS}" > "${LAYOUT_RENDERED}"
 
+# The DaemonSet mounts nvme-disk-layouts by name, so a changed layout (or
+# nvme-init.py) only reaches the disks once the init container runs again.
+bootstrap_needs_rollout=0
+if kubectl -n kube-system get cm nvme-disk-layouts >/dev/null 2>&1; then
+  live_layouts="$(kubectl -n kube-system get cm nvme-disk-layouts \
+    -o jsonpath='{.data.disk-layouts\.yaml}' 2>/dev/null || true)"
+  live_script="$(kubectl -n kube-system get cm nvme-disk-layouts \
+    -o jsonpath='{.data.nvme-init\.py}' 2>/dev/null || true)"
+  if [[ "${live_layouts}" != "$(cat "${LAYOUT_RENDERED}")" ]] ||
+     [[ "${live_script}" != "$(cat "${NVME_INIT}")" ]]; then
+    bootstrap_needs_rollout=1
+  fi
+fi
+
 kubectl create configmap nvme-disk-layouts \
   --from-file=disk-layouts.yaml="${LAYOUT_RENDERED}" \
-  --from-file=nvme-init.py="${SETUP_DIR}/nvme-init.py" \
+  --from-file=nvme-init.py="${NVME_INIT}" \
   -n kube-system \
   --dry-run=client -o yaml | kubectl apply -f -
 rm -f "${LAYOUT_RENDERED}"
 
 echo "Applying NVMe bootstrap DaemonSet..."
-kubectl apply -f "${SETUP_DIR}/nvme-bootstrap-daemonset.yaml"
+kubectl apply -f "${NVME_DIR}/nvme-bootstrap-daemonset.yaml"
+
+if [[ "${bootstrap_needs_rollout}" -eq 1 ]] && kubectl -n kube-system get ds nvme-bootstrap >/dev/null 2>&1; then
+  echo "Disk layout or nvme-init.py changed — restarting nvme-bootstrap to re-run init..."
+  kubectl -n kube-system rollout restart ds/nvme-bootstrap
+  kubectl -n kube-system rollout status ds/nvme-bootstrap --timeout="${NVME_WAIT_TIMEOUT}s"
+  prune_stale_whole_device_pvs "${NVME_DISK_LAYOUT:-${NODE_TYPE}}"
+  prune_stale_discovery_path_pvs
+fi
 
 ready="$(nvme_bootstrap_ready)"
 desired="$(nvme_bootstrap_desired)"
 if [[ "${desired}" -gt 0 ]]; then
   wait_nvme_bootstrap_ready "${desired}"
+  prune_stale_whole_device_pvs "${NVME_DISK_LAYOUT:-${NODE_TYPE}}"
+  prune_stale_discovery_path_pvs
   ensure_baseline_local_ssd_pvs_for_setup
 else
   echo "nvme-bootstrap not scheduled yet — run step 0.2-nodes first; PV check runs in 0.6 validation."

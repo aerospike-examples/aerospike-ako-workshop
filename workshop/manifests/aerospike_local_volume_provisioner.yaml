@@ -1,5 +1,7 @@
 ---
 # Training-local local volume provisioner — pinned to blkdiscard block cleanup.
+# Block PVs (local-ssd) only. The Section 4 all-flash cluster adds the
+# local-ssd-fs class on top — see manifests/all-flash-local-provisioner-*.yaml.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,8 +13,8 @@ data:
     storageclass: local-ssd
   storageClassMap: |
     local-ssd:
-       hostDir: /mnt/disks
-       mountDir:  /mnt/disks
+       hostDir: /mnt/disks/data
+       mountDir:  /mnt/disks/data
        blockCleanerCommand:
          - "/scripts/blkdiscard.sh"
        volumeMode: Block
@@ -52,7 +54,7 @@ spec:
               readOnly: true
             - mountPath: /dev
               name: provisioner-dev
-            - mountPath:  /mnt/disks
+            - mountPath:  /mnt/disks/data
               name: local-ssd
               mountPropagation: "HostToContainer"
       volumes:
@@ -64,7 +66,8 @@ spec:
             path: /dev
         - name: local-ssd
           hostPath:
-            path: /mnt/disks
+            path: /mnt/disks/data
+            type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: ServiceAccount

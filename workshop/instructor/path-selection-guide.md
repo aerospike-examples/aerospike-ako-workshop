@@ -46,7 +46,7 @@ Also pick **one node provisioning path** for the main cluster (`my-cluster`) and
 
 - Audience runs Karpenter or cluster autoscaler patterns in production
 - Teaching dynamic node provisioning during scale-up labs
-- Full main curriculum including rack labs (EBS `ssd` workdir + `local-ssd` block namespace data on i8g nodes)
+- Full main curriculum including rack labs (`ssd` workdir + `local-ssd` block namespace data on i8g nodes)
 
 **Rack labs (1.2, 1.3):** both end on the vertical `i8g.4xlarge` pool (`workshop.aerospike.com/node-pool=vertical`). Lab 1.2 uses rack **revision** (same rack IDs); Lab 1.3 uses rack **replacement** (racks 3+4 replace 1+2) — standalone, does not require 1.2 v2.
 
@@ -57,11 +57,22 @@ Also pick **one node provisioning path** for the main cluster (`my-cluster`) and
 **Not supported on Karpenter path:**
 
 - Lab 2.5 **`k8sNodeBlockList`** — incompatible with Karpenter node affinity ([AKO #305](https://github.com/aerospike/aerospike-kubernetes-operator/issues/305)). Use drain + safe eviction only.
-- Lab 2.6 upgrade-lab cluster — always eksctl MNG (separate cluster)
+
+Lab **2.6** is not run on the Karpenter main cluster. It uses the dedicated upgrade-lab cluster (eksctl MNG on EKS). GKE sessions use a GKE node pool on that same dedicated cluster.
 
 **Lab 2.5 Karpenter add-on (~15m):** optional instructor discussion on graduating from `karpenter.sh/do-not-disrupt` to voluntary disruption — see [05-k8s-node-maintenance-karpenter.md](../sections/02-maintenance-and-upgrade/05-k8s-node-maintenance-karpenter.md#add-on--graduating-from-do-not-disrupt-to-karpenter-native-disruption-15-min). Covers `terminationGracePeriod` sizing (workshop default 600s).
 
 **During live demos:** set `KARPENTER_CONSOLIDATION=Off` in `workshop.env` to reduce node churn.
+
+## Node provisioning — GKE node pools
+
+**Use when:** `CLOUD_PROVIDER=gke` (Karpenter is AWS-only).
+
+**Bootstrap:** `./scripts/setup/02-bootstrap-gke.sh` with `NODE_PROVISIONING=nodepool`
+
+**Lab 2.6:** same two-phase control-plane then worker-pool upgrade as EKS; scripts call `gcloud container clusters upgrade`.
+
+**Local NVMe init:** `nvme-bootstrap` DaemonSet (automatic on every new node)
 
 ## Do not mix paths mid-session
 
@@ -78,14 +89,14 @@ Also pick **one node provisioning path** for the main cluster (`my-cluster`) and
 | NVMe disk init | nvme-bootstrap DS | nvme-bootstrap DS |
 | Scale-up observe | ASG/MNG only | `kubectl get nodeclaims -w` |
 | Lab 2.5 blocklist | Yes | **No** |
-| Lab 2.6 cluster | eksctl MNG | eksctl MNG (unchanged) |
+| Lab 2.6 cluster | eksctl MNG (GKE: node pool) | eksctl MNG (unchanged; GKE N/A) |
 
 ## Environment variables
 
 ```bash
 # workshop.env
 DEPLOY_PATH=olm              # olm | helm
-NODE_PROVISIONING=eksctl     # eksctl | karpenter
+NODE_PROVISIONING=eksctl     # eksctl | karpenter | nodepool (GKE)
 ```
 
-[setup-all.sh](../scripts/setup/setup-all.sh) dispatches on lab step and `DEPLOY_PATH`. [02-bootstrap-eks.sh](../scripts/setup/02-bootstrap-eks.sh) dispatches on `NODE_PROVISIONING`.
+[setup-all.sh](../scripts/setup/setup-all.sh) dispatches on lab step and `DEPLOY_PATH`. [02-bootstrap-eks.sh](../scripts/setup/02-bootstrap-eks.sh) / [02-bootstrap-gke.sh](../scripts/setup/02-bootstrap-gke.sh) dispatch on `CLOUD_PROVIDER` and `NODE_PROVISIONING`.

@@ -2,10 +2,11 @@
 # Single source of truth for lab metadata, dependencies, and validation status.
 # Add new labs by copying _templates/lab-walkthrough.md and appending here.
 #
-# node_provisioning: orthogonal to deploy_paths — [eksctl] | [eksctl, karpenter]
+# node_provisioning: orthogonal to deploy_paths — [eksctl] | [eksctl, karpenter] | GKE: nodepool
+# cloud_providers: [eks, gke] unless a lab is EKS-only (Karpenter path)
 # deploy_paths: [kubectl] = Path A (OLM + kubectl apply); [helm] = Path B (Helm values)
-# Main-cluster labs support both unless noted. Lab 2.6 upgrade-lab is eksctl-only.
-# Lab 2.5 k8sNodeBlockList is eksctl-only (see eksctl_only_features).
+# Main-cluster labs support both unless noted. Lab 2.6 upgrade-lab is eksctl MNG on EKS, GKE node pools on GKE.
+# Lab 2.5 k8sNodeBlockList is supported on eksctl MNG and GKE node pools (not Karpenter).
 
 sections:
   - id: "00-environment-setup"
@@ -24,9 +25,15 @@ sections:
     title: Security & Authentication
     path: sections/03-security-and-authentication
     status: active
-  - id: "04-future-section"
+  - id: "04-all-flash-storage"
+    title: All-flash Storage
+    path: sections/04-all-flash-storage
+    status: active
+    cluster: all-flash
+    note: "Optional — dedicated cluster, off by default (setup step 0.8)"
+  - id: "99-future-section"
     title: Reserved for future sections
-    path: sections/04-future-section
+    path: sections/99-future-section
     status: stub
 
 labs:
@@ -51,10 +58,12 @@ labs:
     section: "00-environment-setup"
     guide: sections/00-environment-setup/02-eks-cluster.md
     guide_karpenter: sections/00-environment-setup/02-eks-cluster-karpenter.md
+    guide_gke: sections/00-environment-setup/02-gke-cluster.md
     eks_cluster: my-cluster
     ako_min_version: null
     deploy_paths: [kubectl]
     node_provisioning: [eksctl, karpenter]
+    cloud_providers: [eks, gke]
     artifacts:
       kubectl: [clusters/main-cluster.yaml]
     artifacts_karpenter:
@@ -63,6 +72,7 @@ labs:
         - scripts/setup/karpenter/
     scripts:
       - scripts/setup/02-bootstrap-eks.sh
+      - scripts/setup/02-bootstrap-gke.sh
       - scripts/setup/karpenter/setup-all-karpenter.sh
     depends_on: ["0.1"]
     doc_urls:
@@ -119,9 +129,9 @@ labs:
     deploy_paths: [kubectl, helm]
     node_provisioning: [eksctl, karpenter]
     artifacts:
-      kubectl: [scripts/setup/nvme-bootstrap-daemonset.yaml, config/disk-layouts.yaml]
+      kubectl: [scripts/setup/nvme-bootstrap/nvme-bootstrap-daemonset.yaml, scripts/setup/nvme-bootstrap/disk-layouts.yaml]
     scripts:
-      - scripts/setup/05-setup-ebs-storage.sh
+      - scripts/setup/05-setup-ssd-storage.sh
       - scripts/setup/06-setup-local-storage.sh
     depends_on: ["0.4"]
     doc_urls:
@@ -155,15 +165,53 @@ labs:
     ako_min_version: null
     deploy_paths: [kubectl, helm]
     node_provisioning: [eksctl]
-    node_provisioning_note: "Upgrade-lab cluster always uses eksctl MNG — independent of main cluster NODE_PROVISIONING"
+    node_provisioning_note: "Upgrade-lab cluster always uses eksctl MNG (GKE: node pool) — independent of main cluster NODE_PROVISIONING"
+    cloud_providers: [eks, gke]
+    opt_in: true
+    opt_in_note: "setup-all.sh does not create this cluster by default; run --step 0.7 or --with-upgrade-lab"
     artifacts:
       kubectl: [clusters/upgrade-lab-cluster.yaml, manifests/disk-cluster.yaml, manifests/dim-cluster.yaml]
     scripts:
       - scripts/setup/upgrade-lab/00-bootstrap-eks.sh
+      - scripts/setup/upgrade-lab/00-bootstrap-gke.sh
       - scripts/setup/upgrade-lab/setup-upgrade-lab-post-bootstrap.sh
     depends_on: ["0.6"]
     doc_urls:
       - https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html
+      - https://cloud.google.com/kubernetes-engine/docs/how-to/upgrading-a-cluster
+    validation_status: draft
+    validated_on: null
+    validated_with: { ako: null, k8s: null }
+
+  - id: "0.8"
+    title: All-flash cluster (Section 4)
+    section: "00-environment-setup"
+    guide: sections/00-environment-setup/08-all-flash-cluster.md
+    eks_cluster: my-cluster-all-flash
+    ako_min_version: "4.5.0"
+    deploy_paths: [kubectl, helm]
+    node_provisioning: [eksctl]
+    node_provisioning_note: "All-flash cluster always uses eksctl MNG (GKE: node pool) — independent of main cluster NODE_PROVISIONING"
+    cloud_providers: [eks, gke]
+    opt_in: true
+    opt_in_note: "setup-all.sh does not create this cluster by default; run --step 0.8"
+    artifacts:
+      kubectl:
+        - clusters/all-flash-cluster.yaml
+        - manifests/all-flash-sysctl-daemonset.yaml
+        - scripts/setup/nvme-bootstrap/disk-layouts.yaml
+        - vendor/storage/local_fs_storage_class.yaml
+      helm: []
+    scripts:
+      - scripts/setup/all-flash/setup-all-flash.sh
+      - scripts/setup/all-flash/setup-all-flash-post-bootstrap.sh
+      - scripts/setup/all-flash/00-bootstrap-eks.sh
+      - scripts/setup/all-flash/00-bootstrap-gke.sh
+      - scripts/setup/all-flash/03-setup-local-storage.sh
+    depends_on: ["0.6"]
+    doc_urls:
+      - https://aerospike.com/docs/kubernetes/manage/storage/all-flash
+      - https://aerospike.com/docs/database/learn/best-practices/
     validation_status: draft
     validated_on: null
     validated_with: { ako: null, k8s: null }
@@ -350,7 +398,7 @@ labs:
     eks_cluster: my-cluster
     ako_min_version: "4.5.0"
     deploy_paths: [kubectl, helm]
-    node_provisioning: [eksctl, karpenter]
+    node_provisioning: [eksctl, karpenter, nodepool]
     eksctl_only_features: [k8sNodeBlockList]
     artifacts:
       kubectl:
@@ -384,7 +432,10 @@ labs:
     ako_min_version: null
     deploy_paths: [kubectl, helm]
     node_provisioning: [eksctl]
-    node_provisioning_note: "Upgrade-lab cluster always uses eksctl MNG — independent of main cluster NODE_PROVISIONING"
+    node_provisioning_note: "Upgrade-lab cluster always uses eksctl MNG (GKE: node pool) — independent of main cluster NODE_PROVISIONING"
+    cloud_providers: [eks, gke]
+    opt_in: true
+    opt_in_note: "Optional — dedicated upgrade-lab cluster (setup step 0.7)"
     artifacts:
       kubectl: [manifests/disk-cluster.yaml, manifests/dim-cluster.yaml, clusters/upgrade-lab-cluster.yaml]
     scripts:
@@ -399,6 +450,7 @@ labs:
     depends_on: ["0.6", "0.7"]
     doc_urls:
       - https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html
+      - https://cloud.google.com/kubernetes-engine/docs/how-to/upgrading-a-cluster
     validation_status: draft
     validated_on: null
     validated_with: { ako: null, k8s: null }
@@ -545,6 +597,74 @@ labs:
     validated_on: null
     validated_with: { ako: null, k8s: null }
 
+  - id: "4.1"
+    title: Deploy an all-flash cluster
+    section: "04-all-flash-storage"
+    guide: sections/04-all-flash-storage/01-deploy-all-flash.md
+    eks_cluster: my-cluster-all-flash
+    ako_min_version: "4.5.0"
+    deploy_paths: [kubectl, helm]
+    node_provisioning: [eksctl]
+    node_provisioning_note: "All-flash cluster always uses eksctl MNG (GKE: node pool)"
+    cloud_providers: [eks, gke]
+    cluster_storage: all-flash
+    opt_in: true
+    opt_in_note: "Optional Section 4 — dedicated all-flash cluster (setup step 0.8)"
+    artifacts:
+      kubectl:
+        - manifests/all-flash-cluster.yaml
+        - manifests/all-flash-cluster-gke.yaml
+        - manifests/all-flash-sysctl-daemonset.yaml
+      helm:
+        - helm/base-all-flash-cluster-values.yaml
+        - helm/base-all-flash-cluster-gke-values.yaml
+    scripts:
+      - scripts/labs/prepare-lab.sh
+      - scripts/labs/deploy-all-flash-cluster.sh
+      - scripts/labs/deploy-all-flash-cluster-helm.sh
+      - scripts/labs/validate-all-flash.sh
+    depends_on: ["0.8"]
+    doc_urls:
+      - https://aerospike.com/docs/kubernetes/manage/storage/all-flash
+      - https://aerospike.com/docs/database/manage/namespace/primary-index
+    validation_status: draft
+    validated_on: null
+    validated_with: { ako: null, k8s: null }
+
+  - id: "4.2"
+    title: Scale an all-flash cluster
+    section: "04-all-flash-storage"
+    guide: sections/04-all-flash-storage/02-scale-all-flash.md
+    eks_cluster: my-cluster-all-flash
+    ako_min_version: "4.5.0"
+    deploy_paths: [kubectl, helm]
+    node_provisioning: [eksctl]
+    cloud_providers: [eks, gke]
+    cluster_storage: all-flash
+    opt_in: true
+    opt_in_note: "Optional Section 4 — dedicated all-flash cluster (setup step 0.8)"
+    artifacts:
+      kubectl:
+        - manifests/all-flash-cluster-scale-4.yaml
+        - manifests/all-flash-cluster-gke-scale-4.yaml
+      helm:
+        - helm/base-all-flash-cluster-values.yaml
+        - helm/base-all-flash-cluster-gke-values.yaml
+        - helm/overlay-all-flash-scale-4-values.yaml
+    scripts:
+      - scripts/labs/prepare-lab.sh
+      - scripts/labs/load-data.sh
+      - scripts/labs/scale-all-flash-cluster.sh
+      - scripts/setup/all-flash/ensure-nodegroup.sh
+      - scripts/labs/validate-all-flash.sh
+    depends_on: ["4.1"]
+    doc_urls:
+      - https://aerospike.com/docs/kubernetes/manage/configure/scaling
+      - https://aerospike.com/docs/kubernetes/manage/storage/all-flash
+    validation_status: draft
+    validated_on: null
+    validated_with: { ako: null, k8s: null }
+
 curriculum_order:
   - "0.1"
   - "0.2"
@@ -552,7 +672,6 @@ curriculum_order:
   - "0.4"
   - "0.5"
   - "0.6"
-  - "0.7"
   - "1.1"
   - "1.2"
   - "1.3"
@@ -562,24 +681,30 @@ curriculum_order:
   - "2.3"
   - "2.4"
   - "2.5"
-  - "2.6"
   - "3.1"
   - "3.2"
   - "3.3"
   - "3.4"
   - "3.5"
+  # Optional dedicated-cluster tracks — off by default (setup-all.sh --step 0.7 / 0.8).
+  - "0.7"
+  - "2.6"
+  - "0.8"
+  - "4.1"
+  - "4.2"
 
 future_sections:
-  - id: "04-monitoring"
+  - id: "05-monitoring"
     title: Monitoring & Observability
-  - id: "05-backup-and-restore"
+  - id: "06-backup-and-restore"
     title: Backup & Restore
-  - id: "06-strong-consistency"
+  - id: "07-strong-consistency"
     title: Strong Consistency
 
 node_provisioning_defaults:
   main_cluster: [eksctl, karpenter]
   upgrade_lab: [eksctl]
+  all_flash: [eksctl]
 
 karpenter_validation:
   status: draft
@@ -592,5 +717,5 @@ karpenter_validation:
   validator: null
   notes: >
     Run full main curriculum once on EKS with NODE_PROVISIONING=karpenter.
-    Lab 2.6 remains on separate eksctl upgrade-lab cluster.
+    Lab 2.6 remains on a separate upgrade-lab cluster (eksctl MNG on EKS, GKE node pool on GKE).
     Lab 2.5 blocklist path is eksctl-only.

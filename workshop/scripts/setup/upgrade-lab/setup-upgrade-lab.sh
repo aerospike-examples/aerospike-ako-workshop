@@ -24,7 +24,11 @@ if cluster_exists "${UPGRADE_LAB_CLUSTER_NAME}"; then
   ensure_upgrade_lab_kubecontext
   "${UPGRADE_DIR}/ensure-nodegroup.sh"
 else
-  "${UPGRADE_DIR}/00-bootstrap-eks.sh"
+  if [[ "${CLOUD_PROVIDER}" == "gke" ]]; then
+    "${UPGRADE_DIR}/00-bootstrap-gke.sh"
+  else
+    "${UPGRADE_DIR}/00-bootstrap-eks.sh"
+  fi
 fi
 
 "${UPGRADE_DIR}/setup-upgrade-lab-post-bootstrap.sh"

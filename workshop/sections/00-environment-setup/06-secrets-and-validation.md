@@ -4,7 +4,7 @@
 |-------|-------|
 | Lab ID | `0.6` |
 | Section | Environment Setup |
-| EKS cluster | `my-cluster` |
+| Cluster | `${CLUSTER_NAME}` (default `my-cluster`) |
 | Aerospike cluster | — (none yet) |
 | Duration | ~10 min |
 | Validation status | `draft` |
@@ -87,7 +87,7 @@ Secrets are deployed and the platform is validated — **no AerospikeCluster yet
    kubectl get pv -o custom-columns=NAME:.metadata.name,CLASS:.spec.storageClassName,CAPACITY:.spec.capacity.storage,STATUS:.status.phase --no-headers | awk '$2 == "local-ssd"'
    ```
 
-   **Pass:** PV count matches instance-type layout × `${NODE_COUNT}` (e.g. 12 PVs for 4× i8g.2xlarge).
+   **Pass:** PV count matches instance-type layout × `${NODE_COUNT}` (e.g. EKS: 12 PVs for 4× i8g.2xlarge; GKE: 12 PVs for 4× n2-highmem-8 — 3 local NVMe × 4 nodes).
 
 ## Observe
 
@@ -98,7 +98,8 @@ Secrets are deployed and the platform is validated — **no AerospikeCluster yet
 
 **Main cluster ready.** The script closes with `Run ./scripts/labs/prepare-lab.sh 1.1 to start Section 1 (full reset + re-ensure nodes)`.
 
-- Unless you passed `--skip-upgrade-lab`, finish [Lab 0.7 — upgrade-lab cluster](07-upgrade-lab-cluster.md) next
+- Optional: [Lab 0.7 — upgrade-lab cluster](07-upgrade-lab-cluster.md) if you will teach Lab 2.6 (`--step 0.7`)
+- Optional: [Lab 0.8 — all-flash cluster](08-all-flash-cluster.md) if you will teach Section 4 (`--step 0.8`)
 - Then proceed to [Section 1 — Scaling & Capacity](../01-scaling-and-capacity/README.md)
 
 ## Workshop artifacts

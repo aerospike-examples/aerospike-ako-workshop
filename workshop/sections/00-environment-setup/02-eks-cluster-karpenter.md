@@ -4,10 +4,12 @@
 |-------|-------|
 | Lab ID | `0.2` |
 | Section | Environment Setup |
-| EKS cluster | `my-cluster` |
+| Cluster | `my-cluster` |
 | Node provisioning | **Karpenter** |
 | Duration | ~40 min |
 | Validation status | `draft` |
+
+**GKE path:** Karpenter is EKS-only. When `CLOUD_PROVIDER=gke`, use [02-gke-cluster.md](02-gke-cluster.md).
 
 ## Takeaway
 
@@ -128,6 +130,8 @@ If NodePool apply failed (e.g. `consolidationPolicy: Off`) or bootstrap pods sho
 ## Not covered here
 
 eksctl managed nodegroup path → [02-eks-cluster.md](02-eks-cluster.md)
+
+GKE Standard (no Karpenter) → [02-gke-cluster.md](02-gke-cluster.md)
 
 ## Workshop artifacts
 

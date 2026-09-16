@@ -1,6 +1,9 @@
 # NVMe bootstrap for all database nodes — replaces manual node-shell loop.
-# Partitions instance-store NVMe per workshop/config/disk-layouts.yaml and symlinks
-# block devices into /mnt/disks for local-volume-provisioner.
+# Partitions instance-store NVMe per scripts/setup/nvme-bootstrap/disk-layouts.yaml and
+# symlinks slices into /mnt/disks/data (Block, local-ssd) or /mnt/disks/index
+# (Filesystem, local-ssd-fs — Section 4 all-flash layouts only, empty elsewhere).
+# Index slices are left unformatted: kubelet formats them when the
+# AerospikeCluster PVC uses volumeMode: Filesystem.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -36,6 +39,19 @@ spec:
                       - i8g.4xlarge
                       - i8g.8xlarge
                       - i8g.2xlarge
+                      - i8ge.3xlarge     # Section 4 all-flash (EKS)
+                      - n2-highmem-8     # GKE
+                      - n2-highmem-16    # GKE
+                      - n2-highmem-32    # GKE
+                      - n2-standard-8    # GKE
+                      - n2-standard-16   # GKE
+                      - n2-standard-32   # GKE
+                      - n2d-highmem-8    # GKE 
+                      - n2d-highmem-16   # GKE 
+                      - n2d-highmem-32   # GKE 
+                      - n2d-standard-8   # GKE 
+                      - n2d-standard-16  # GKE
+                      - n2d-standard-32  # GKE 
       initContainers:
         - name: init-nvme
           image: public.ecr.aws/amazonlinux/amazonlinux:2023
@@ -45,7 +61,8 @@ spec:
             - /bin/bash
             - -ec
             - |
-              if ! command -v parted >/dev/null || ! command -v nvme >/dev/null || ! python3 -c "import yaml" 2>/dev/null; then
+              if ! command -v parted >/dev/null || ! command -v nvme >/dev/null \
+                  || ! python3 -c "import yaml" 2>/dev/null; then
                 echo "Installing NVMe bootstrap packages (first run can take several minutes per node)..."
                 dnf install -y parted util-linux python3-pyyaml nvme-cli
               else
@@ -72,6 +89,8 @@ spec:
               cpu: 1m
               memory: 8Mi
       volumes:
+        # /mnt is read-only on GKE COS; /mnt/disks is tmpfs. nvme-init.py creates
+        # data/ and index/ under that mount — never a sibling of /mnt/disks.
         - name: host-mnt-disks
           hostPath:
             path: /mnt/disks

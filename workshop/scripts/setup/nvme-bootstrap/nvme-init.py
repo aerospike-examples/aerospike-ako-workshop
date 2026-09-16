@@ -22,8 +22,16 @@ except ImportError:
 
 HOST = Path("/host")
 CONFIG = Path("/config/disk-layouts.yaml")
-DISKS_DIR = HOST / "mnt" / "disks"
-LEGACY_BOOTSTRAP_MARKER_DIR = DISKS_DIR / ".nvme-bootstrap"
+# GKE COS: /mnt is read-only; /mnt/disks is a writable tmpfs. Keep both
+# discovery dirs as children of that tmpfs so DirectoryOrCreate never has to
+# mkdir a sibling of /mnt/disks (that is what broke /mnt/disks-fs).
+MNT_DISKS_DIR = HOST / "mnt" / "disks"
+DISKS_DIR = MNT_DISKS_DIR / "data"
+# Layout `fstype` slices are published here as device symlinks. The provisioner
+# StorageClass local-ssd-fs uses volumeMode Filesystem + fsType ext4, so kubelet
+# (via the AerospikeCluster PVC) formats and mounts them — nvme-bootstrap does not.
+FS_DISKS_DIR = MNT_DISKS_DIR / "index"
+LEGACY_BOOTSTRAP_MARKER_DIR = MNT_DISKS_DIR / ".nvme-bootstrap"
 BOOTSTRAP_MARKER_DIR = HOST / "var" / "lib" / "workshop" / "nvme-bootstrap"
 DEV_DIR = Path("/dev")
 
@@ -41,6 +49,25 @@ def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[st
         print(f"skip missing command: {cmd[0]}")
         return subprocess.CompletedProcess(cmd, returncode=127, stdout="", stderr="")
     return subprocess.run(cmd, check=check, text=True, capture_output=True)
+
+
+def gcp_machine_type() -> str | None:
+    req = urllib.request.Request(
+        "http://metadata.google.internal/computeMetadata/v1/instance/machine-type",
+        headers={"Metadata-Flavor": "Google"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            return resp.read().decode().strip().rsplit("/", 1)[-1]
+    except OSError:
+        return None
+
+
+def detect_instance_type() -> str:
+    gcp = gcp_machine_type()
+    if gcp:
+        return gcp
+    return imds_instance_type()
 
 
 def imds_instance_type() -> str:
@@ -241,6 +268,18 @@ def remove_legacy_bootstrap_markers() -> None:
     shutil.rmtree(LEGACY_BOOTSTRAP_MARKER_DIR)
 
 
+def remove_legacy_flat_discovery_links() -> None:
+    """Drop nvme* symlinks from /mnt/disks itself (pre-data/index layout)."""
+    if not MNT_DISKS_DIR.is_dir():
+        return
+    for path in MNT_DISKS_DIR.iterdir():
+        if path.name in {"data", "index"}:
+            continue
+        if path.name.startswith("nvme") and path.is_symlink():
+            path.unlink()
+            print(f"removed legacy discovery symlink {path}")
+
+
 def write_bootstrap_marker(device: str) -> None:
     marker = bootstrap_marker_path(device)
     marker.parent.mkdir(parents=True, exist_ok=True)
@@ -251,17 +290,42 @@ def partition_path(device: str, number: int) -> Path:
     return DEV_DIR / f"{device}p{number}"
 
 
-def partition_is_ready(device: str, number: int) -> bool:
+def partition_fstype(spec: dict) -> str | None:
+    """Non-empty `fstype` marks an index slice for local-ssd-fs (Filesystem PVs).
+
+    The value is not used to mkfs here. Kubelet formats the device when the
+    AerospikeCluster PVC has volumeMode: Filesystem.
+    """
+    fstype = (spec.get("fstype") or "").strip()
+    return fstype or None
+
+
+def fs_link_path(device: str, number: int) -> Path:
+    return FS_DISKS_DIR / f"{device}p{number}"
+
+
+def is_mountpoint(path: Path) -> bool:
+    return run(["mountpoint", "-q", str(path)], check=False).returncode == 0
+
+
+def partition_link_ready(link: Path, part: Path) -> bool:
+    return link.is_symlink() and link.resolve() == part.resolve()
+
+
+def partition_is_ready(device: str, number: int, fstype: str | None = None) -> bool:
     part = partition_path(device, number)
-    link = DISKS_DIR / f"{device}p{number}"
-    return part.exists() and link.is_symlink() and link.resolve() == part.resolve()
+    if not part.exists():
+        return False
+    link = fs_link_path(device, number) if fstype else DISKS_DIR / f"{device}p{number}"
+    return partition_link_ready(link, part)
+
+
+def spec_is_ready(device: str, spec: dict) -> bool:
+    return partition_is_ready(device, int(spec["number"]), partition_fstype(spec))
 
 
 def all_partitions_ready(device: str, partitions_spec: list[dict]) -> bool:
-    return all(
-        partition_is_ready(device, int(spec["number"]))
-        for spec in partitions_spec
-    )
+    return all(spec_is_ready(device, spec) for spec in partitions_spec)
 
 
 def device_bootstrap_complete(device: str, partitions_spec: list[dict]) -> bool:
@@ -273,10 +337,7 @@ def device_bootstrap_complete(device: str, partitions_spec: list[dict]) -> bool:
 
 
 def any_partition_ready(device: str, partitions_spec: list[dict]) -> bool:
-    return any(
-        partition_is_ready(device, int(spec["number"]))
-        for spec in partitions_spec
-    )
+    return any(spec_is_ready(device, spec) for spec in partitions_spec)
 
 
 def wipe_gpt(device: str) -> None:
@@ -351,7 +412,7 @@ def apply_partition_layout(device: str, partitions_spec: list[dict]) -> None:
         ensure_gpt_label(device)
         for spec in partitions_spec:
             number = int(spec["number"])
-            if partition_is_ready(device, number) or partition_path(device, number).exists():
+            if spec_is_ready(device, spec) or partition_path(device, number).exists():
                 print(f"skipping allocated partition {device}p{number}")
                 continue
             create_gpt_partition(
@@ -371,21 +432,42 @@ def apply_partition_layout(device: str, partitions_spec: list[dict]) -> None:
             )
 
     for spec in partitions_spec:
-        symlink_partition(device, int(spec["number"]))
+        publish_partition(device, spec)
 
     write_bootstrap_marker(device)
     log_partition_table(device)
 
 
-def symlink_partition(device: str, number: int) -> None:
+def publish_partition(device: str, spec: dict) -> None:
+    number = int(spec["number"])
+    dest = FS_DISKS_DIR if partition_fstype(spec) else DISKS_DIR
+    symlink_partition(device, number, dest)
+
+
+def symlink_partition(device: str, number: int, dest_dir: Path = DISKS_DIR) -> None:
     name = f"{device}p{number}"
     target = Path(f"/dev/{name}")
-    link = DISKS_DIR / name
-    link.parent.mkdir(parents=True, exist_ok=True)
-    if link.is_symlink() and link.resolve() == target:
+    link = dest_dir / name
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    if is_mountpoint(link):
+        # Earlier workshop builds formatted+mounted index slices here. Drop the
+        # host mount so the provisioner can publish a raw device Filesystem PV.
+        print(f"unmounting leftover bootstrap mount {link}")
+        run(["umount", str(link)], check=False)
+        if is_mountpoint(link):
+            print(f"WARN: {link} still mounted — skip replacing with a device symlink")
+            return
+    if partition_link_ready(link, target):
         return
     if link.exists() or link.is_symlink():
-        link.unlink()
+        if link.is_dir() and not link.is_symlink():
+            try:
+                link.rmdir()
+            except OSError:
+                print(f"WARN: could not replace leftover directory {link}")
+                return
+        else:
+            link.unlink()
     link.symlink_to(str(target))
     print(f"symlink {link} -> {target}")
 
@@ -436,6 +518,18 @@ def whole_device_bootstrap(devices: list[str]) -> None:
         write_bootstrap_marker(device)
 
 
+def remove_whole_device_symlink(device: str) -> None:
+    """Drop a whole-device symlink left by an earlier whole-device layout.
+
+    Without this the provisioner keeps publishing a PV for the entire disk
+    alongside the partition PVs, so two PVs would map to overlapping storage.
+    """
+    link = DISKS_DIR / device
+    if link.is_symlink():
+        link.unlink()
+        print(f"removed stale whole-device symlink {link}")
+
+
 def load_layout_for_instance_type(config_path: Path, instance_type: str) -> dict:
     with config_path.open() as handle:
         config = yaml.safe_load(handle)
@@ -444,7 +538,7 @@ def load_layout_for_instance_type(config_path: Path, instance_type: str) -> dict
 
 
 def expected_pvs_per_node(layout: dict) -> int | None:
-    """Expected local-ssd PV count per node for a disk layout entry."""
+    """Expected local-ssd (Block) PV count per node for a disk layout entry."""
     if layout.get("mode") == "whole-device":
         selector = layout.get("instance_store", "all")
         if selector == "all":
@@ -454,11 +548,24 @@ def expected_pvs_per_node(layout: dict) -> int | None:
             return int(devices)
         return 1
 
+    return _partitions_per_node(layout, want_fs=False)
+
+
+def expected_index_mounts_per_node(layout: dict) -> int | None:
+    """Expected local-ssd-fs (Filesystem) PV count per node — all-flash index mounts."""
+    if layout.get("mode") == "whole-device":
+        return 0
+    return _partitions_per_node(layout, want_fs=True)
+
+
+def _partitions_per_node(layout: dict, *, want_fs: bool) -> int | None:
     partitions = layout.get("partitions") or []
     if not partitions:
         return None
 
-    per_device = len(partitions)
+    per_device = sum(
+        1 for spec in partitions if bool(partition_fstype(spec)) == want_fs
+    )
     selector = layout.get("instance_store", "first")
     if selector == "all":
         devices = layout.get("instance_store_devices")
@@ -473,7 +580,7 @@ def load_layout() -> tuple[str, dict]:
         config = yaml.safe_load(handle)
     force = (config.get("force_layout") or "").strip()
     layouts = config.get("layouts") or {}
-    instance_type = force or imds_instance_type()
+    instance_type = force or detect_instance_type()
     layout = layouts.get(instance_type) or layouts.get("default") or {}
     print(
         f"instance-type={instance_type} "
@@ -489,8 +596,10 @@ def partitioned_bootstrap(layout: dict, stores: list[str]) -> None:
         return
 
     DISKS_DIR.mkdir(parents=True, exist_ok=True)
+    FS_DISKS_DIR.mkdir(parents=True, exist_ok=True)
     for device in devices:
         print(f"partitioning instance-store device {device}")
+        remove_whole_device_symlink(device)
         apply_partition_layout(device, layout.get("partitions") or [])
 
 
@@ -500,6 +609,7 @@ def bootstrap_main() -> int:
         return 0
 
     remove_legacy_bootstrap_markers()
+    remove_legacy_flat_discovery_links()
 
     _, layout = load_layout()
     stores = discover_instance_store_devices()
@@ -518,6 +628,8 @@ def bootstrap_main() -> int:
 
     print("disk bootstrap summary:")
     run(["ls", "-la", str(DISKS_DIR)], check=False)
+    if FS_DISKS_DIR.is_dir():
+        run(["ls", "-la", str(FS_DISKS_DIR)], check=False)
     return 0
 
 
@@ -526,7 +638,17 @@ def cli_main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--expected-pvs-per-node",
         action="store_true",
-        help="Print expected local-ssd PV count per node for --instance-type",
+        help="Print expected local-ssd (Block) PV count per node for --instance-type",
+    )
+    parser.add_argument(
+        "--expected-index-mounts-per-node",
+        action="store_true",
+        help="Print expected local-ssd-fs (Filesystem) PV count per node for --instance-type",
+    )
+    parser.add_argument(
+        "--layout-mode",
+        action="store_true",
+        help="Print 'partitioned' or 'whole-device' for --instance-type",
     )
     parser.add_argument(
         "--config",
@@ -540,15 +662,27 @@ def cli_main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if args.expected_pvs_per_node:
+    if args.expected_pvs_per_node or args.expected_index_mounts_per_node or args.layout_mode:
+        if args.expected_pvs_per_node:
+            flag = "--expected-pvs-per-node"
+        elif args.expected_index_mounts_per_node:
+            flag = "--expected-index-mounts-per-node"
+        else:
+            flag = "--layout-mode"
         if not args.instance_type:
-            print("ERROR: --instance-type is required with --expected-pvs-per-node", file=sys.stderr)
+            print(f"ERROR: --instance-type is required with {flag}", file=sys.stderr)
             return 1
         if not args.config.is_file():
             print(f"ERROR: config file not found: {args.config}", file=sys.stderr)
             return 1
         layout = load_layout_for_instance_type(args.config, args.instance_type)
-        count = expected_pvs_per_node(layout)
+        if args.layout_mode:
+            print("partitioned" if layout.get("partitions") else layout.get("mode", "unknown"))
+            return 0
+        if args.expected_pvs_per_node:
+            count = expected_pvs_per_node(layout)
+        else:
+            count = expected_index_mounts_per_node(layout)
         if count is not None:
             print(count)
         return 0

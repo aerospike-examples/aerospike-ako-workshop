@@ -4,7 +4,7 @@
 |-------|-------|
 | Lab ID | `2.3` |
 | Section | Maintenance & Upgrade |
-| EKS cluster | `my-cluster` |
+| Cluster | `my-cluster` |
 | AKO min version | `4.4.0` |
 | Aerospike baseline | 3-node on **8.1.0.x** (device storage default; same as `deploy-cluster.sh`) |
 | Deploy path | both |
